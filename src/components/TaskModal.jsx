@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 const PRIORITIES = ['高', '中', '低'];
-const PROGRESS_VALUES = [0, 25, 50, 75, 100];
+const PROGRESS_VALUES = [25, 50, 75, 100];
 
 export default function TaskModal({ isOpen, task, onSave, onClose }) {
   const [title, setTitle] = useState('');
@@ -125,7 +125,7 @@ export default function TaskModal({ isOpen, task, onSave, onClose }) {
                 <button
                   key={val}
                   type="button"
-                  onClick={() => setProgress(val)}
+                  onClick={() => setProgress(val === progress && val === PROGRESS_VALUES[0] ? 0 : val)}
                   className={`flex-1 h-3 rounded-full transition-colors ${
                     val <= progress ? 'bg-[#1e3a5f]' : 'bg-gray-200'
                   }`}
@@ -133,12 +133,12 @@ export default function TaskModal({ isOpen, task, onSave, onClose }) {
                 />
               ))}
             </div>
-            <div className="flex justify-between text-[10px] text-[#6b6b6b] mt-0.5 px-1">
-              <span>0%</span>
-              <span>25%</span>
-              <span>50%</span>
-              <span>75%</span>
-              <span>100%</span>
+            <div className="flex text-[10px] text-[#6b6b6b] mt-0.5">
+              <span className="flex-1 text-left">0%</span>
+              <span className="flex-1 text-center">25%</span>
+              <span className="flex-1 text-center">50%</span>
+              <span className="flex-1 text-center">75%</span>
+              <span className="text-right">100%</span>
             </div>
           </div>
 

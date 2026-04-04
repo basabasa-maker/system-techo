@@ -58,8 +58,40 @@ export function useGasSync() {
       if (result && result.success) {
         const n = result.notes || [];
         const t = result.tasks || [];
-        const j = result.journal || {};
-        const d = result.daily || [];
+
+        // Journal: GAS returns array, convert to object keyed by date
+        const journalArray = result.journal || [];
+        const j = Array.isArray(journalArray)
+          ? (() => {
+              const obj = {};
+              journalArray.forEach(entry => {
+                if (entry.date) {
+                  let dateKey = entry.date;
+                  if (dateKey instanceof Date || (typeof dateKey === 'string' && dateKey.includes('T'))) {
+                    const dt = new Date(dateKey);
+                    dateKey = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+                  }
+                  obj[dateKey] = { ...entry, date: dateKey };
+                }
+              });
+              return obj;
+            })()
+          : journalArray;
+
+        // Daily: normalize date strings and numeric fields
+        const d = (result.daily || []).map(entry => ({
+          ...entry,
+          date: (() => {
+            let dd = entry.date;
+            if (dd instanceof Date || (typeof dd === 'string' && dd.includes('T'))) {
+              const dt = new Date(dd);
+              return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+            }
+            return dd;
+          })(),
+          hour: Number(entry.hour),
+          endHour: entry.endHour !== '' && entry.endHour != null ? Number(entry.endHour) : '',
+        }));
 
         setNotes(n);
         setTasks(t);
@@ -109,7 +141,9 @@ export function useGasSync() {
       setSaving(true);
       setError(null);
 
-      const result = await saveData(type, data);
+      // Journal is stored as object locally but GAS expects array
+      const itemsToSave = type === 'journal' ? Object.values(data) : data;
+      const result = await saveData(type, itemsToSave);
 
       if (!result || !result.success) {
         setError(`${type}の保存に失敗しました`);
@@ -171,8 +205,40 @@ export function useGasSync() {
     if (result && result.success) {
       const n = result.notes || [];
       const t = result.tasks || [];
-      const j = result.journal || {};
-      const d = result.daily || [];
+
+      // Journal: GAS returns array, convert to object keyed by date
+      const journalArray = result.journal || [];
+      const j = Array.isArray(journalArray)
+        ? (() => {
+            const obj = {};
+            journalArray.forEach(entry => {
+              if (entry.date) {
+                let dateKey = entry.date;
+                if (dateKey instanceof Date || (typeof dateKey === 'string' && dateKey.includes('T'))) {
+                  const dt = new Date(dateKey);
+                  dateKey = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+                }
+                obj[dateKey] = { ...entry, date: dateKey };
+              }
+            });
+            return obj;
+          })()
+        : journalArray;
+
+      // Daily: normalize date strings and numeric fields
+      const d = (result.daily || []).map(entry => ({
+        ...entry,
+        date: (() => {
+          let dd = entry.date;
+          if (dd instanceof Date || (typeof dd === 'string' && dd.includes('T'))) {
+            const dt = new Date(dd);
+            return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+          }
+          return dd;
+        })(),
+        hour: Number(entry.hour),
+        endHour: entry.endHour !== '' && entry.endHour != null ? Number(entry.endHour) : '',
+      }));
 
       setNotes(n);
       setTasks(t);

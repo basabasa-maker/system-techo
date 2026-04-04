@@ -195,11 +195,15 @@ export default function TaskTab({ tasks, onUpdate }) {
                     </div>
 
                     {/* Progress bar */}
-                    <div className="mt-2 w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#1e3a5f] rounded-full transition-all duration-300"
-                        style={{ width: `${task.progress}%` }}
-                      />
+                    <div className="flex gap-1 mt-2">
+                      {[25, 50, 75, 100].map((val) => (
+                        <div
+                          key={val}
+                          className={`h-1.5 flex-1 rounded-full ${
+                            val <= task.progress ? 'bg-[#1e3a5f]' : 'bg-gray-200'
+                          }`}
+                        />
+                      ))}
                     </div>
 
                     <div className="flex items-center gap-3 mt-1.5">
