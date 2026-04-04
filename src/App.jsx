@@ -40,7 +40,7 @@ function App() {
         onReload={handleReload}
       />
       {/* Spacer for fixed header */}
-      <div style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 88px)' }}>
+      <div style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 104px)' }}>
         {renderTab()}
       </div>
     </div>
