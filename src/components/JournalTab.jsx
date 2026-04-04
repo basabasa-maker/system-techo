@@ -110,9 +110,9 @@ export default function JournalTab({ journal, onUpdate }) {
     const displayDate = formatDisplayDate(dateObj);
 
     return (
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-lg mx-auto flex flex-col min-h-0 overflow-hidden" style={{ maxHeight: 'calc(100vh - 180px)' }}>
         {/* Back + Date Header */}
-        <div className="mb-4">
+        <div className="mb-4 flex-shrink-0">
           <button
             onClick={goBackToCalendar}
             className="flex items-center gap-1 text-[#1e3a5f] text-sm mb-3 hover:opacity-70 transition-opacity"
@@ -126,7 +126,7 @@ export default function JournalTab({ journal, onUpdate }) {
         </div>
 
         {selectedEntry ? (
-          <div className="bg-white rounded-[10px] border border-[#e0ddd5] shadow-sm p-5">
+          <div className="bg-white rounded-[10px] border border-[#e0ddd5] shadow-sm p-5 flex-1 min-h-0 overflow-y-auto">
             <p className="text-[#2c2c2c] text-sm leading-relaxed whitespace-pre-wrap">
               {selectedEntry.text}
             </p>
@@ -185,7 +185,7 @@ export default function JournalTab({ journal, onUpdate }) {
 
   // ===== Calendar View =====
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg mx-auto min-h-0 overflow-hidden">
       {/* Month Navigation */}
       <div className="flex items-center justify-between mb-5">
         <button

@@ -90,7 +90,8 @@ export default function NoteTab({ notes, onUpdate }) {
   return (
     <div className="pb-24">
       {/* Search */}
-      <div className="relative mb-4">
+      <div className="sticky top-[calc(env(safe-area-inset-top,0px)+104px)] z-30 bg-[#f5f5f0] pb-2 pt-1 -mx-4 px-4">
+      <div className="relative mb-0">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b6b6b] text-sm">
           🔍
         </span>
@@ -101,6 +102,7 @@ export default function NoteTab({ notes, onUpdate }) {
           placeholder="ノートを検索..."
           className="w-full pl-9 pr-3 py-2.5 border border-[#e0ddd5] rounded-[10px] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30"
         />
+      </div>
       </div>
 
       {/* Note List */}

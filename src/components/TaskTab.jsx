@@ -17,9 +17,15 @@ const PRIORITY_COLORS = {
   '低': 'bg-[#7fb88f] text-white',
 };
 
+function isCompleted(task) {
+  const s = String(task.status || '').toLowerCase();
+  return s === 'completed' || s === '完了';
+}
+
 function formatDue(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T12:00:00');
+  if (isNaN(d.getTime())) return '';
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
@@ -34,13 +40,15 @@ export default function TaskTab({ tasks, onUpdate }) {
   // Filter tasks
   const filteredTasks = allTasks
     .filter((t) => {
-      if (filter === 'active') return t.status === 'active';
-      if (filter === 'completed') return t.status === 'completed';
-      if (filter === 'shopping') return t.shopping && t.status === 'active';
+      if (filter === 'active') return !isCompleted(t);
+      if (filter === 'completed') return isCompleted(t);
+      if (filter === 'shopping') return t.shopping && !isCompleted(t);
       return true; // 'all'
     })
     .sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'completed' ? 1 : -1;
+      const aComp = isCompleted(a);
+      const bComp = isCompleted(b);
+      if (aComp !== bComp) return aComp ? 1 : -1;
       const pDiff = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
       if (pDiff !== 0) return pDiff;
       if (a.due && b.due) return a.due.localeCompare(b.due);
@@ -127,7 +135,8 @@ export default function TaskTab({ tasks, onUpdate }) {
   return (
     <div className="pb-24">
       {/* Filter Bar */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+      <div className="sticky top-[calc(env(safe-area-inset-top,0px)+104px)] z-30 bg-[#f5f5f0] pb-2 pt-1 -mx-4 px-4">
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-0 scrollbar-hide">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -142,6 +151,7 @@ export default function TaskTab({ tasks, onUpdate }) {
           </button>
         ))}
       </div>
+      </div>
 
       {/* Task List */}
       {filteredTasks.length === 0 ? (
@@ -151,25 +161,26 @@ export default function TaskTab({ tasks, onUpdate }) {
       ) : (
         <div className="space-y-3">
           {filteredTasks.map((task) => {
-            const isCompleted = task.status === 'completed';
+            const completed = isCompleted(task);
+            const progress = Number(task.progress) || 0;
             return (
               <div
                 key={task.id}
                 className={`bg-white rounded-[10px] border border-[#e0ddd5] shadow-sm p-4 transition-opacity ${
-                  isCompleted ? 'opacity-60' : ''
+                  completed ? 'opacity-60' : ''
                 }`}
               >
                 <div className="flex items-start gap-3">
                   {/* Checkbox */}
                   <button
-                    onClick={() => isCompleted ? handleUncomplete(task) : handleComplete(task)}
+                    onClick={() => completed ? handleUncomplete(task) : handleComplete(task)}
                     className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                      isCompleted
+                      completed
                         ? 'bg-[#1e3a5f] border-[#1e3a5f] text-white'
                         : 'border-[#e0ddd5] hover:border-[#1e3a5f]'
                     }`}
                   >
-                    {isCompleted && (
+                    {completed && (
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
@@ -181,7 +192,7 @@ export default function TaskTab({ tasks, onUpdate }) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
                         className={`font-bold text-[#2c2c2c] text-sm ${
-                          isCompleted ? 'line-through text-[#6b6b6b]' : ''
+                          completed ? 'line-through text-[#6b6b6b]' : ''
                         }`}
                       >
                         {task.shopping && <span className="mr-1">🛒</span>}
@@ -200,7 +211,7 @@ export default function TaskTab({ tasks, onUpdate }) {
                         <div
                           key={val}
                           className={`h-1.5 flex-1 rounded-full ${
-                            val <= task.progress ? 'bg-[#1e3a5f]' : 'bg-gray-200'
+                            val <= progress ? 'bg-[#1e3a5f]' : 'bg-gray-200'
                           }`}
                         />
                       ))}
@@ -212,7 +223,7 @@ export default function TaskTab({ tasks, onUpdate }) {
                           期限: {formatDue(task.due)}
                         </span>
                       )}
-                      <span className="text-xs text-[#6b6b6b]">{task.progress}%</span>
+                      <span className="text-xs text-[#6b6b6b]">{progress}%</span>
                     </div>
                   </div>
 
