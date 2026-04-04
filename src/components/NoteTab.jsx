@@ -2,30 +2,6 @@ import { useState } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import NoteModal from './NoteModal';
 
-const SAMPLE_NOTES = [
-  {
-    id: 1,
-    title: '民泊BPO 業務フロー',
-    content: '<p>チェックイン対応 → 清掃手配 → ゲストフォロー → チェックアウト確認</p><p>緊急時は社長直通。シフト表は毎月更新。</p>',
-    read: true,
-    created: '2026-04-03T15:30:00',
-  },
-  {
-    id: 2,
-    title: 'Instagram投稿アイデア',
-    content: 'ADHD×AI仕組み化シリーズ\n・朝ルーティン自動化\n・タスク管理の変遷\n・AI秘書との1日',
-    read: false,
-    created: '2026-04-04T10:00:00',
-  },
-  {
-    id: 3,
-    title: '唎酒師試験メモ',
-    content: '試験日: 5/20\n範囲: 日本酒の基礎知識、テイスティング、料理とのペアリング\nテキスト到着待ち',
-    read: false,
-    created: '2026-04-02T08:00:00',
-  },
-];
-
 function formatDate(isoStr) {
   if (!isoStr) return '';
   const d = new Date(isoStr);
@@ -34,7 +10,6 @@ function formatDate(isoStr) {
 }
 
 function renderContent(content) {
-  // If content contains HTML tags, render as HTML; otherwise render as plain text with line breaks
   if (/<[a-z][\s\S]*>/i.test(content)) {
     return <div className="text-sm text-[#2c2c2c] leading-relaxed" dangerouslySetInnerHTML={{ __html: content }} />;
   }
@@ -45,19 +20,20 @@ function renderContent(content) {
   );
 }
 
-export default function NoteTab() {
-  const [notes, setNotes] = useState(SAMPLE_NOTES);
+export default function NoteTab({ notes, onUpdate }) {
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
 
+  const allNotes = notes || [];
+
   // Filter by search
-  const filteredNotes = notes.filter((n) => {
+  const filteredNotes = allNotes.filter((n) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q);
+    return n.title.toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q);
   });
 
   const handleDelete = (note) => {
@@ -66,7 +42,8 @@ export default function NoteTab() {
       title: 'ノート削除',
       message: 'このノートを削除しますか？',
       onConfirm: () => {
-        setNotes((prev) => prev.filter((n) => n.id !== note.id));
+        const updated = allNotes.filter((n) => n.id !== note.id);
+        onUpdate(updated);
         if (expandedId === note.id) setExpandedId(null);
         setConfirmDialog((d) => ({ ...d, open: false }));
       },
@@ -75,14 +52,13 @@ export default function NoteTab() {
 
   const handleSave = (noteData) => {
     if (noteData.id) {
-      // Edit — update created to now
-      setNotes((prev) =>
-        prev.map((n) =>
-          n.id === noteData.id
-            ? { ...n, ...noteData, created: new Date().toISOString() }
-            : n
-        )
+      // Edit
+      const updated = allNotes.map((n) =>
+        n.id === noteData.id
+          ? { ...n, ...noteData, created: new Date().toISOString() }
+          : n
       );
+      onUpdate(updated);
     } else {
       // New
       const newNote = {
@@ -91,7 +67,7 @@ export default function NoteTab() {
         read: false,
         created: new Date().toISOString(),
       };
-      setNotes((prev) => [newNote, ...prev]);
+      onUpdate([newNote, ...allNotes]);
     }
     setModalOpen(false);
     setEditingNote(null);
@@ -159,7 +135,7 @@ export default function NoteTab() {
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-[#e0ddd5]">
                     <div className="pt-3 pb-2">
-                      {renderContent(note.content)}
+                      {renderContent(note.content || '')}
                     </div>
                     <div className="flex justify-end gap-1 pt-2">
                       <button

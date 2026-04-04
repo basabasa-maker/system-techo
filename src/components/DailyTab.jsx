@@ -1,21 +1,56 @@
-import { useState, useMemo } from 'react';
-import { generateTimeSlots, slotToNumber, localDateStr } from '../utils/dateUtils';
+import { useState, useMemo, useEffect } from 'react';
+import { generateTimeSlots, slotToNumber } from '../utils/dateUtils';
+import ConfirmDialog from './ConfirmDialog';
 
 const TIME_SLOTS = generateTimeSlots();
 
-function BlockModal({ isOpen, onClose, onSave, initialSlot }) {
-  const [startHour, setStartHour] = useState(initialSlot?.hour ?? 9);
-  const [startMin, setStartMin] = useState(initialSlot?.minute ?? 0);
-  const [endHour, setEndHour] = useState(initialSlot ? initialSlot.hour + 1 : 10);
-  const [endMin, setEndMin] = useState(initialSlot?.minute ?? 0);
+const PRIORITY_COLORS = {
+  '高': 'bg-[#e8b8b8] text-[#2c2c2c]',
+  '中': 'bg-[#e8c88f] text-[#2c2c2c]',
+  '低': 'bg-[#7fb88f] text-white',
+};
+
+function BlockModal({ isOpen, onClose, onSave, initialSlot, editingBlock }) {
+  const [startHour, setStartHour] = useState(9);
+  const [startMin, setStartMin] = useState(0);
+  const [endHour, setEndHour] = useState(10);
+  const [endMin, setEndMin] = useState(0);
   const [description, setDescription] = useState('');
   const [blockType, setBlockType] = useState('manual');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (editingBlock) {
+        setStartHour(editingBlock.startHour);
+        setStartMin(editingBlock.startMin);
+        setEndHour(editingBlock.endHour);
+        setEndMin(editingBlock.endMin);
+        setDescription(editingBlock.description || '');
+        setBlockType(editingBlock.type || 'manual');
+      } else if (initialSlot) {
+        setStartHour(initialSlot.hour);
+        setStartMin(initialSlot.minute);
+        setEndHour(initialSlot.hour + 1);
+        setEndMin(initialSlot.minute);
+        setDescription('');
+        setBlockType('manual');
+      } else {
+        setStartHour(9);
+        setStartMin(0);
+        setEndHour(10);
+        setEndMin(0);
+        setDescription('');
+        setBlockType('manual');
+      }
+    }
+  }, [isOpen, editingBlock, initialSlot]);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
     if (!description.trim()) return;
     onSave({
+      ...(editingBlock || {}),
       startHour,
       startMin,
       endHour,
@@ -23,11 +58,9 @@ function BlockModal({ isOpen, onClose, onSave, initialSlot }) {
       description: description.trim(),
       type: blockType,
     });
-    setDescription('');
     onClose();
   };
 
-  // Generate hour options for start (4-27) and end (4-27, with 28 for 4:00 end)
   const hourOptions = [];
   for (let h = 4; h <= 27; h++) {
     const displayH = h >= 24 ? h - 24 : h;
@@ -53,7 +86,7 @@ function BlockModal({ isOpen, onClose, onSave, initialSlot }) {
           className="text-base font-bold mb-4"
           style={{ color: '#1e3a5f' }}
         >
-          予定を追加
+          {editingBlock ? '予定を編集' : '予定を追加'}
         </h3>
 
         {/* Time selectors */}
@@ -160,61 +193,201 @@ function BlockModal({ isOpen, onClose, onSave, initialSlot }) {
   );
 }
 
-export default function DailyTab({ dateStr }) {
-  const [blocks, setBlocks] = useState([]);
+export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, tasks, onTasksUpdate, loadCalendar }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [tasks, setTasks] = useState([
-    { id: 1, text: '(タスクタブと連携予定)', done: false },
-  ]);
+  const [editingBlock, setEditingBlock] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
+
+  // Load calendar events when dateStr changes
+  useEffect(() => {
+    if (loadCalendar && dateStr) {
+      loadCalendar(dateStr);
+    }
+  }, [dateStr, loadCalendar]);
+
+  // Filter blocks for the current date
+  const blocks = useMemo(() => {
+    return (entries || []).filter((b) => b.date === dateStr);
+  }, [entries, dateStr]);
+
+  // Convert calendar events to block-like objects (type: 'plan')
+  const calendarBlocks = useMemo(() => {
+    if (!calendarEvents || calendarEvents.length === 0) return [];
+    return calendarEvents.map((ev) => {
+      // Parse start/end times from event
+      const startDate = ev.start ? new Date(ev.start) : null;
+      const endDate = ev.end ? new Date(ev.end) : null;
+      if (!startDate || !endDate) return null;
+
+      let startHour = startDate.getHours();
+      let startMin = startDate.getMinutes() >= 30 ? 30 : 0;
+      let endHour = endDate.getHours();
+      let endMin = endDate.getMinutes() >= 30 ? 30 : 0;
+
+      // Handle times before 4AM as next-day (24+)
+      if (startHour < 4) startHour += 24;
+      if (endHour < 4) endHour += 24;
+      // If end equals start (could be end of minute), bump to at least 30min
+      if (startHour === endHour && startMin === endMin) {
+        endMin += 30;
+        if (endMin >= 60) { endHour += 1; endMin = 0; }
+      }
+
+      return {
+        id: `cal-${ev.id || ev.summary}`,
+        startHour,
+        startMin,
+        endHour,
+        endMin,
+        description: ev.summary || ev.title || '(予定)',
+        type: 'plan',
+        calendarEvent: true,
+      };
+    }).filter(Boolean);
+  }, [calendarEvents]);
+
+  // Merge manual entries with calendar blocks. Manual overrides auto/plan at same slot.
+  const allBlocks = useMemo(() => {
+    return [...blocks, ...calendarBlocks];
+  }, [blocks, calendarBlocks]);
+
+  // Today's tasks: filter tasks with due === dateStr and status === 'active'
+  const todayTasks = useMemo(() => {
+    if (!tasks) return [];
+    return tasks.filter((t) => t.due === dateStr && t.status === 'active');
+  }, [tasks, dateStr]);
 
   const handleSlotTap = (slot) => {
-    setSelectedSlot(slot);
-    setModalOpen(true);
+    // Check if there's a manual block on this slot to edit
+    const slotNum = slotToNumber(slot.hour, slot.minute);
+    const slotEnd = slotNum + 0.5;
+    const existing = blocks.find((b) => {
+      const bStart = slotToNumber(b.startHour, b.startMin);
+      const bEnd = slotToNumber(b.endHour, b.endMin);
+      return bStart < slotEnd && bEnd > slotNum && !b.calendarEvent;
+    });
+
+    if (existing) {
+      // Edit existing block
+      setEditingBlock(existing);
+      setSelectedSlot(null);
+      setModalOpen(true);
+    } else {
+      // Add new block
+      setEditingBlock(null);
+      setSelectedSlot(slot);
+      setModalOpen(true);
+    }
   };
 
-  const handleAddBlock = (blockData) => {
-    setBlocks((prev) => [
-      ...prev,
-      { ...blockData, id: Date.now(), date: dateStr },
-    ]);
+  const handleSaveBlock = (blockData) => {
+    const allEntries = entries || [];
+
+    if (blockData.id && !blockData.calendarEvent) {
+      // Edit existing
+      const updated = allEntries.map((b) =>
+        b.id === blockData.id ? { ...b, ...blockData } : b
+      );
+      onUpdate(updated);
+    } else {
+      // Add new
+      const newBlock = {
+        ...blockData,
+        id: Date.now(),
+        date: dateStr,
+      };
+      onUpdate([...allEntries, newBlock]);
+    }
+  };
+
+  const handleDeleteBlock = (block) => {
+    if (block.calendarEvent) return; // Can't delete calendar events
+    setConfirmDialog({
+      open: true,
+      title: '予定を削除',
+      message: `「${block.description}」を削除しますか？`,
+      onConfirm: () => {
+        const updated = (entries || []).filter((b) => b.id !== block.id);
+        onUpdate(updated);
+        setConfirmDialog((d) => ({ ...d, open: false }));
+      },
+    });
+  };
+
+  const handleLongPress = (block) => {
+    if (block.calendarEvent) return;
+    handleDeleteBlock(block);
   };
 
   const handleFabTap = () => {
     setSelectedSlot(null);
+    setEditingBlock(null);
     setModalOpen(true);
   };
 
-  const toggleTask = (id) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
+  const handleTaskComplete = (task) => {
+    setConfirmDialog({
+      open: true,
+      title: 'タスク完了',
+      message: `「${task.title}」を完了しますか？`,
+      onConfirm: () => {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const completedDate = `${y}-${m}-${d}`;
+
+        const updatedTasks = tasks.map((t) =>
+          t.id === task.id
+            ? { ...t, status: 'completed', progress: 100, completedDate }
+            : t
+        );
+        onTasksUpdate(updatedTasks);
+        setConfirmDialog((d) => ({ ...d, open: false }));
+      },
+    });
   };
 
-  // Build a lookup: for each slot, find which blocks overlap it
+  // Build slot -> block lookup. Manual > plan > auto priority.
   const slotBlockMap = useMemo(() => {
     const map = new Map();
     TIME_SLOTS.forEach((slot) => {
       const slotNum = slotToNumber(slot.hour, slot.minute);
       const slotEnd = slotNum + 0.5;
-      // Find blocks that overlap this slot. Manual blocks take priority.
-      const overlapping = blocks
+      const overlapping = allBlocks
         .filter((b) => {
           const bStart = slotToNumber(b.startHour, b.startMin);
           const bEnd = slotToNumber(b.endHour, b.endMin);
           return bStart < slotEnd && bEnd > slotNum;
         })
         .sort((a, b) => {
-          // manual wins over auto
-          if (a.type === 'manual' && b.type !== 'manual') return -1;
-          if (b.type === 'manual' && a.type !== 'manual') return 1;
-          return 0;
+          // manual wins over plan/auto
+          const typePriority = { manual: 0, plan: 1, auto: 2 };
+          return (typePriority[a.type] ?? 1) - (typePriority[b.type] ?? 1);
         });
       const key = `${slot.hour}-${slot.minute}`;
       map.set(key, overlapping);
     });
     return map;
-  }, [blocks]);
+  }, [allBlocks]);
+
+  // Long press handling
+  const longPressTimer = useMemo(() => ({ current: null }), []);
+
+  const handleTouchStart = (block) => {
+    if (!block || block.calendarEvent) return;
+    longPressTimer.current = setTimeout(() => {
+      handleLongPress(block);
+    }, 600);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
 
   return (
     <div className="pb-24">
@@ -225,7 +398,6 @@ export default function DailyTab({ dateStr }) {
           const overlapping = slotBlockMap.get(key) || [];
           const topBlock = overlapping[0] || null;
 
-          // Determine if this is the first slot of the block (show text)
           let showText = false;
           if (topBlock) {
             const bStart = slotToNumber(topBlock.startHour, topBlock.startMin);
@@ -234,9 +406,11 @@ export default function DailyTab({ dateStr }) {
           }
 
           const bgColor = topBlock
-            ? topBlock.type === 'auto'
-              ? '#b8d4e8'
-              : '#e8b8b8'
+            ? topBlock.type === 'plan'
+              ? '#d4e8b8'
+              : topBlock.type === 'auto'
+                ? '#b8d4e8'
+                : '#e8b8b8'
             : 'transparent';
 
           return (
@@ -248,6 +422,9 @@ export default function DailyTab({ dateStr }) {
                 minHeight: '36px',
               }}
               onClick={() => handleSlotTap(slot)}
+              onTouchStart={() => handleTouchStart(topBlock)}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
             >
               {/* Time label */}
               <div
@@ -267,6 +444,9 @@ export default function DailyTab({ dateStr }) {
               >
                 {showText && topBlock && (
                   <span className="text-xs font-medium truncate" style={{ color: '#2c2c2c' }}>
+                    {topBlock.type === 'plan' && (
+                      <span className="mr-1 opacity-60">GCal</span>
+                    )}
                     {topBlock.description}
                   </span>
                 )}
@@ -284,29 +464,36 @@ export default function DailyTab({ dateStr }) {
         >
           今日のタスク
         </h3>
-        {tasks.map((task) => (
-          <div
-            key={task.id}
-            className="flex items-center gap-2 py-2 border-b"
-            style={{ borderColor: '#e0ddd5' }}
-          >
-            <input
-              type="checkbox"
-              checked={task.done}
-              onChange={() => toggleTask(task.id)}
-              className="w-4 h-4"
-            />
-            <span
-              className="text-sm"
-              style={{
-                color: task.done ? '#6b6b6b' : '#2c2c2c',
-                textDecoration: task.done ? 'line-through' : 'none',
-              }}
-            >
-              {task.text}
-            </span>
+        {todayTasks.length === 0 ? (
+          <div className="text-xs text-[#6b6b6b] py-2">
+            今日が期限のタスクはありません
           </div>
-        ))}
+        ) : (
+          todayTasks.map((task) => (
+            <div
+              key={task.id}
+              className="flex items-center gap-2 py-2 border-b"
+              style={{ borderColor: '#e0ddd5' }}
+            >
+              <input
+                type="checkbox"
+                checked={false}
+                onChange={() => handleTaskComplete(task)}
+                className="w-4 h-4"
+              />
+              <span className="text-sm flex-1" style={{ color: '#2c2c2c' }}>
+                {task.title}
+              </span>
+              {task.priority && (
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLORS[task.priority] || ''}`}
+                >
+                  {task.priority}
+                </span>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       {/* Floating Action Button */}
@@ -319,12 +506,22 @@ export default function DailyTab({ dateStr }) {
         +
       </button>
 
-      {/* Add Modal */}
+      {/* Block Modal */}
       <BlockModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleAddBlock}
+        onClose={() => { setModalOpen(false); setEditingBlock(null); }}
+        onSave={handleSaveBlock}
         initialSlot={selectedSlot}
+        editingBlock={editingBlock}
+      />
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((d) => ({ ...d, open: false }))}
       />
     </div>
   );

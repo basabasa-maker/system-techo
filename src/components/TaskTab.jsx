@@ -17,60 +17,22 @@ const PRIORITY_COLORS = {
   '低': 'bg-[#7fb88f] text-white',
 };
 
-const SAMPLE_TASKS = [
-  {
-    id: 1,
-    title: 'SAKIYOMI初期設定',
-    priority: '高',
-    due: '2026-04-10',
-    progress: 50,
-    status: 'active',
-    note: 'アカウント設定とコンテンツ計画',
-    created: '2026-04-01T09:00:00',
-    completedDate: '',
-    shopping: false,
-  },
-  {
-    id: 2,
-    title: '唎酒師テキスト購入',
-    priority: '中',
-    due: '2026-04-15',
-    progress: 0,
-    status: 'active',
-    note: '',
-    created: '2026-04-02T10:00:00',
-    completedDate: '',
-    shopping: true,
-  },
-  {
-    id: 3,
-    title: 'n8nワークフロー確認',
-    priority: '低',
-    due: '2026-04-05',
-    progress: 75,
-    status: 'active',
-    note: 'YouTube分析WFの動作チェック',
-    created: '2026-04-03T14:00:00',
-    completedDate: '',
-    shopping: false,
-  },
-];
-
 function formatDue(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-export default function TaskTab() {
-  const [tasks, setTasks] = useState(SAMPLE_TASKS);
+export default function TaskTab({ tasks, onUpdate }) {
   const [filter, setFilter] = useState('active');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
 
+  const allTasks = tasks || [];
+
   // Filter tasks
-  const filteredTasks = tasks
+  const filteredTasks = allTasks
     .filter((t) => {
       if (filter === 'active') return t.status === 'active';
       if (filter === 'completed') return t.status === 'completed';
@@ -78,9 +40,7 @@ export default function TaskTab() {
       return true; // 'all'
     })
     .sort((a, b) => {
-      // Completed tasks at the bottom
       if (a.status !== b.status) return a.status === 'completed' ? 1 : -1;
-      // Sort by priority then due date
       const pDiff = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
       if (pDiff !== 0) return pDiff;
       if (a.due && b.due) return a.due.localeCompare(b.due);
@@ -95,24 +55,28 @@ export default function TaskTab() {
       title: 'タスク完了',
       message: 'このタスクを完了しますか？',
       onConfirm: () => {
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === task.id
-              ? { ...t, status: 'completed', progress: 100, completedDate: new Date().toISOString() }
-              : t
-          )
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const completedDate = `${y}-${m}-${d}`;
+
+        const updated = allTasks.map((t) =>
+          t.id === task.id
+            ? { ...t, status: 'completed', progress: 100, completedDate }
+            : t
         );
+        onUpdate(updated);
         setConfirmDialog((d) => ({ ...d, open: false }));
       },
     });
   };
 
   const handleUncomplete = (task) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === task.id ? { ...t, status: 'active', progress: 75, completedDate: '' } : t
-      )
+    const updated = allTasks.map((t) =>
+      t.id === task.id ? { ...t, status: 'active', progress: 75, completedDate: '' } : t
     );
+    onUpdate(updated);
   };
 
   const handleDelete = (task) => {
@@ -121,7 +85,8 @@ export default function TaskTab() {
       title: 'タスク削除',
       message: 'このタスクを削除しますか？',
       onConfirm: () => {
-        setTasks((prev) => prev.filter((t) => t.id !== task.id));
+        const updated = allTasks.filter((t) => t.id !== task.id);
+        onUpdate(updated);
         setConfirmDialog((d) => ({ ...d, open: false }));
       },
     });
@@ -130,7 +95,8 @@ export default function TaskTab() {
   const handleSave = (taskData) => {
     if (taskData.id) {
       // Edit
-      setTasks((prev) => prev.map((t) => (t.id === taskData.id ? { ...t, ...taskData } : t)));
+      const updated = allTasks.map((t) => (t.id === taskData.id ? { ...t, ...taskData } : t));
+      onUpdate(updated);
     } else {
       // New
       const newTask = {
@@ -142,7 +108,7 @@ export default function TaskTab() {
         progress: taskData.progress ?? 0,
         shopping: taskData.shopping ?? false,
       };
-      setTasks((prev) => [...prev, newTask]);
+      onUpdate([...allTasks, newTask]);
     }
     setModalOpen(false);
     setEditingTask(null);

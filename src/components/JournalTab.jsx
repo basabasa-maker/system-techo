@@ -4,7 +4,7 @@ import JournalModal from './JournalModal';
 import ConfirmDialog from './ConfirmDialog';
 
 function generateCalendarDays(year, month) {
-  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const days = [];
 
@@ -27,16 +27,17 @@ function formatTime(isoString) {
   return `${h}:${m}`;
 }
 
-export default function JournalTab() {
+export default function JournalTab({ journal, onUpdate }) {
   const today = new Date();
   const todayStr = localDateStr(today);
 
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState(null);
-  const [entries, setEntries] = useState({});
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  const entries = journal || {};
 
   const calendarDays = useMemo(
     () => generateCalendarDays(currentYear, currentMonth),
@@ -77,28 +78,25 @@ export default function JournalTab() {
 
   const handleSave = (text) => {
     const now = new Date().toISOString();
-    setEntries((prev) => {
-      const existing = prev[selectedDate];
-      return {
-        ...prev,
-        [selectedDate]: {
-          id: existing ? existing.id : Date.now(),
-          date: selectedDate,
-          text,
-          created: existing ? existing.created : now,
-          updated: now,
-        },
-      };
-    });
+    const existing = entries[selectedDate];
+    const updated = {
+      ...entries,
+      [selectedDate]: {
+        id: existing ? existing.id : Date.now(),
+        date: selectedDate,
+        text,
+        created: existing ? existing.created : now,
+        updated: now,
+      },
+    };
+    onUpdate(updated);
     setModalOpen(false);
   };
 
   const handleDelete = () => {
-    setEntries((prev) => {
-      const next = { ...prev };
-      delete next[selectedDate];
-      return next;
-    });
+    const updated = { ...entries };
+    delete updated[selectedDate];
+    onUpdate(updated);
     setConfirmDeleteOpen(false);
   };
 
@@ -128,7 +126,6 @@ export default function JournalTab() {
         </div>
 
         {selectedEntry ? (
-          /* Entry exists */
           <div className="bg-white rounded-[10px] border border-[#e0ddd5] shadow-sm p-5">
             <p className="text-[#2c2c2c] text-sm leading-relaxed whitespace-pre-wrap">
               {selectedEntry.text}
@@ -154,7 +151,6 @@ export default function JournalTab() {
             </div>
           </div>
         ) : (
-          /* No entry yet */
           <div className="bg-white rounded-[10px] border border-[#e0ddd5] shadow-sm p-8 text-center">
             <p className="text-[#6b6b6b] text-sm mb-5">
               この日のジャーナルはまだありません
@@ -168,7 +164,6 @@ export default function JournalTab() {
           </div>
         )}
 
-        {/* Edit Modal */}
         <JournalModal
           isOpen={modalOpen}
           entry={selectedEntry}
@@ -177,7 +172,6 @@ export default function JournalTab() {
           onClose={() => setModalOpen(false)}
         />
 
-        {/* Delete Confirm */}
         <ConfirmDialog
           isOpen={confirmDeleteOpen}
           title="ジャーナルを削除"
