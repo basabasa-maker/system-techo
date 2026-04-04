@@ -78,8 +78,10 @@ export function useGasSync() {
             })()
           : journalArray;
 
-        // Daily: normalize date strings and numeric fields
-        const d = (result.daily || []).map(entry => ({
+        // Daily: normalize date strings and numeric fields, filter empty rows
+        const d = (result.daily || [])
+          .filter(entry => entry.date && entry.date !== '' && entry.id)
+          .map(entry => ({
           ...entry,
           date: (() => {
             let dd = entry.date;
@@ -225,8 +227,10 @@ export function useGasSync() {
           })()
         : journalArray;
 
-      // Daily: normalize date strings and numeric fields
-      const d = (result.daily || []).map(entry => ({
+      // Daily: normalize date strings and numeric fields, filter empty rows
+      const d = (result.daily || [])
+        .filter(entry => entry.date && entry.date !== '' && entry.id)
+        .map(entry => ({
         ...entry,
         date: (() => {
           let dd = entry.date;
