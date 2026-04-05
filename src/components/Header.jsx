@@ -1,15 +1,18 @@
+import { forwardRef } from 'react';
+
 const TABS = ['Daily', 'Task', 'Note', 'Journal'];
 
-export default function Header({
+export default forwardRef(function Header({
   dateDisplay,
   activeTab,
   onTabChange,
   onPrevDay,
   onNextDay,
   onReload,
-}) {
+}, ref) {
   return (
     <header
+      ref={ref}
       className="fixed top-0 left-0 right-0 z-50"
       style={{ backgroundColor: '#1e3a5f' }}
     >
@@ -70,4 +73,4 @@ export default function Header({
       </div>
     </header>
   );
-}
+});

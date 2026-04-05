@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import DailyTab from './components/DailyTab';
 import TaskTab from './components/TaskTab';
@@ -9,6 +9,8 @@ import { useGasSync } from './hooks/useGasSync';
 
 function App() {
   const [activeTab, setActiveTab] = useState('Daily');
+  const headerRef = useRef(null);
+  const [headerHeight, setHeaderHeight] = useState(104);
   const { currentDate, dateStr, goToPrevDay, goToNextDay, formatDate } = useLocalDate();
   const {
     notes, tasks, journal, daily, calendarEvents,
@@ -16,6 +18,16 @@ function App() {
     updateNotes, updateTasks, updateJournal, updateDaily,
     loadCalendar, reload,
   } = useGasSync();
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const updateHeight = () => setHeaderHeight(header.offsetHeight);
+    updateHeight();
+    const ro = new ResizeObserver(updateHeight);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
 
   // Auto-dismiss error after 3 seconds
   const [showError, setShowError] = useState(false);
@@ -53,6 +65,7 @@ function App() {
             dateStr={dateStr}
             tasks={tasks}
             onUpdate={updateTasks}
+            headerHeight={headerHeight}
           />
         );
       case 'Note':
@@ -60,6 +73,7 @@ function App() {
           <NoteTab
             notes={notes}
             onUpdate={updateNotes}
+            headerHeight={headerHeight}
           />
         );
       case 'Journal':
@@ -77,6 +91,7 @@ function App() {
   return (
     <div style={{ backgroundColor: '#f5f5f0', minHeight: '100vh' }}>
       <Header
+        ref={headerRef}
         dateDisplay={formatDate()}
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -85,7 +100,7 @@ function App() {
         onReload={handleReload}
       />
       {/* Spacer for fixed header */}
-      <div style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 104px)' }}>
+      <div style={{ paddingTop: `${headerHeight}px` }}>
         {/* Loading spinner */}
         {loading && (
           <div className="flex items-center justify-center py-20">

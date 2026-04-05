@@ -29,7 +29,7 @@ function formatDue(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-export default function TaskTab({ tasks, onUpdate }) {
+export default function TaskTab({ tasks, onUpdate, headerHeight = 104 }) {
   const [filter, setFilter] = useState('active');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -135,7 +135,7 @@ export default function TaskTab({ tasks, onUpdate }) {
   return (
     <div className="pb-24">
       {/* Filter Bar */}
-      <div className="sticky top-[calc(env(safe-area-inset-top,0px)+104px)] z-30 bg-[#f5f5f0] -mx-4 px-4 pb-2 pt-1">
+      <div className="sticky z-30 bg-[#f5f5f0] -mx-4 px-4 pb-2 pt-1" style={{ top: `${headerHeight}px` }}>
       <div className="flex gap-2 overflow-x-auto pb-2 mb-0 scrollbar-hide">
         {FILTERS.map((f) => (
           <button
