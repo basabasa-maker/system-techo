@@ -190,7 +190,7 @@ export default function JournalTab({ journal, onUpdate }) {
 
   // ===== Calendar View =====
   return (
-    <div className="max-w-lg mx-auto overflow-hidden" style={{ height: 'calc(100vh - env(safe-area-inset-top, 0px) - 120px)' }}>
+    <div className="max-w-lg mx-auto overflow-hidden" style={{ height: 'calc(100dvh - env(safe-area-inset-top, 0px) - 160px)' }}>
       {/* Month Navigation */}
       <div className="flex items-center justify-between mb-5">
         <button

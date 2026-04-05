@@ -246,35 +246,49 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
   }, [entries, dateStr]);
 
   // Convert calendar events to block-like objects (type: 'plan')
+  // GAS returns {id, hour, endHour, text, type} format
   const calendarBlocks = useMemo(() => {
     if (!calendarEvents || calendarEvents.length === 0) return [];
     return calendarEvents.map((ev) => {
-      // Parse start/end times from event
-      const startDate = ev.start ? new Date(ev.start) : null;
-      const endDate = ev.end ? new Date(ev.end) : null;
-      if (!startDate || !endDate) return null;
+      let startHour, startMin, endHour, endMin;
 
-      let startHour = startDate.getHours();
-      let startMin = startDate.getMinutes() >= 30 ? 30 : 0;
-      let endHour = endDate.getHours();
-      let endMin = endDate.getMinutes() >= 30 ? 30 : 0;
+      if (ev.hour != null && !isNaN(Number(ev.hour))) {
+        // GAS format: {hour, endHour}
+        const h = Number(ev.hour);
+        const eh = ev.endHour != null && !isNaN(Number(ev.endHour)) ? Number(ev.endHour) : h + 1;
+        startHour = Math.floor(h);
+        startMin = (h % 1) >= 0.5 ? 30 : 0;
+        endHour = Math.floor(eh);
+        endMin = (eh % 1) >= 0.5 ? 30 : 0;
+      } else if (ev.start) {
+        // ISO format fallback: {start, end}
+        const startDate = new Date(ev.start);
+        const endDate = ev.end ? new Date(ev.end) : null;
+        if (!endDate) return null;
+        startHour = startDate.getHours();
+        startMin = startDate.getMinutes() >= 30 ? 30 : 0;
+        endHour = endDate.getHours();
+        endMin = endDate.getMinutes() >= 30 ? 30 : 0;
+      } else {
+        return null;
+      }
 
       // Handle times before 4AM as next-day (24+)
       if (startHour < 4) startHour += 24;
       if (endHour < 4) endHour += 24;
-      // If end equals start (could be end of minute), bump to at least 30min
+      // If end equals start, bump to at least 30min
       if (startHour === endHour && startMin === endMin) {
         endMin += 30;
         if (endMin >= 60) { endHour += 1; endMin = 0; }
       }
 
       return {
-        id: `cal-${ev.id || ev.summary}`,
+        id: `cal-${ev.id || ev.summary || ev.text}`,
         startHour,
         startMin,
         endHour,
         endMin,
-        description: ev.summary || ev.title || '(予定)',
+        description: ev.text || ev.summary || ev.title || '(予定)',
         type: 'plan',
         calendarEvent: true,
       };
@@ -286,10 +300,12 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
     return [...blocks, ...calendarBlocks];
   }, [blocks, calendarBlocks]);
 
-  // Today's tasks: filter tasks with due === dateStr and status === 'active'
+  // Today's tasks: filter tasks with due === dateStr and active status
+  // Status compatibility: "進行中", "未着手", "", "active" are all treated as active
   const todayTasks = useMemo(() => {
     if (!tasks) return [];
-    return tasks.filter((t) => t.due === dateStr && t.status === 'active');
+    const activeStatuses = ['active', '進行中', '未着手', ''];
+    return tasks.filter((t) => t.due === dateStr && activeStatuses.includes(t.status));
   }, [tasks, dateStr]);
 
   const handleSlotTap = (slot) => {
