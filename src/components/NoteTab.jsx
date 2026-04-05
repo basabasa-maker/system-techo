@@ -22,6 +22,7 @@ function renderContent(content) {
 
 export default function NoteTab({ notes, onUpdate }) {
   const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = newest first, 'asc' = oldest first
   const [expandedId, setExpandedId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
@@ -29,12 +30,18 @@ export default function NoteTab({ notes, onUpdate }) {
 
   const allNotes = notes || [];
 
-  // Filter by search
-  const filteredNotes = allNotes.filter((n) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return n.title.toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q);
-  });
+  // Filter by search, then sort by date
+  const filteredNotes = allNotes
+    .filter((n) => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return n.title.toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      const da = new Date(a.created || 0).getTime();
+      const db = new Date(b.created || 0).getTime();
+      return sortOrder === 'desc' ? db - da : da - db;
+    });
 
   const handleDelete = (note) => {
     setConfirmDialog({
@@ -91,17 +98,26 @@ export default function NoteTab({ notes, onUpdate }) {
     <div className="pb-24">
       {/* Search */}
       <div className="sticky top-[calc(env(safe-area-inset-top,0px)+104px)] z-30 bg-[#f5f5f0] pb-2 pt-1 -mx-4 px-4">
-      <div className="relative mb-0">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b6b6b] text-sm">
-          🔍
-        </span>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="ノートを検索..."
-          className="w-full pl-9 pr-3 py-2.5 border border-[#e0ddd5] rounded-[10px] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30"
-        />
+      <div className="flex gap-2 mb-0">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b6b6b] text-sm">
+            🔍
+          </span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ノートを検索..."
+            className="w-full pl-9 pr-3 py-2.5 border border-[#e0ddd5] rounded-[10px] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30"
+          />
+        </div>
+        <button
+          onClick={() => setSortOrder((o) => o === 'desc' ? 'asc' : 'desc')}
+          className="flex-shrink-0 px-3 py-2.5 border border-[#e0ddd5] rounded-[10px] bg-white text-xs text-[#6b6b6b] hover:bg-[#f5f5f0] transition-colors"
+          title={sortOrder === 'desc' ? '新しい順' : '古い順'}
+        >
+          {sortOrder === 'desc' ? '新↓' : '古↑'}
+        </button>
       </div>
       </div>
 

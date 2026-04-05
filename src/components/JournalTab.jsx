@@ -16,6 +16,11 @@ function generateCalendarDays(year, month) {
     days.push(d);
   }
 
+  // Always pad to 42 cells (6 rows x 7 cols) for consistent height
+  while (days.length < 42) {
+    days.push(null);
+  }
+
   return days;
 }
 

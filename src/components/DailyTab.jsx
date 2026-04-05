@@ -10,6 +10,32 @@ const PRIORITY_COLORS = {
   '低': 'bg-[#7fb88f] text-white',
 };
 
+// GAS format {id, date, hour, endHour, type, text} → UI format {startHour, startMin, endHour, endMin, description, type}
+function gasToUi(entry) {
+  const h = Number(entry.hour);
+  const eh = entry.endHour !== '' && entry.endHour != null ? Number(entry.endHour) : h + 1;
+  return {
+    ...entry,
+    startHour: Math.floor(h),
+    startMin: (h % 1) >= 0.5 ? 30 : 0,
+    endHour: Math.floor(eh),
+    endMin: (eh % 1) >= 0.5 ? 30 : 0,
+    description: entry.text || entry.description || '',
+  };
+}
+
+// UI format → GAS format for saving
+function uiToGas(block) {
+  return {
+    id: block.id,
+    date: block.date,
+    hour: block.startHour + (block.startMin === 30 ? 0.5 : 0),
+    endHour: block.endHour + (block.endMin === 30 ? 0.5 : 0),
+    type: block.type || 'manual',
+    text: block.description || '',
+  };
+}
+
 function BlockModal({ isOpen, onClose, onSave, initialSlot, editingBlock }) {
   const [startHour, setStartHour] = useState(9);
   const [startMin, setStartMin] = useState(0);
@@ -206,9 +232,9 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
     }
   }, [dateStr, loadCalendar]);
 
-  // Filter blocks for the current date
+  // Filter blocks for the current date, converting GAS format to UI format
   const blocks = useMemo(() => {
-    return (entries || []).filter((b) => b.date === dateStr);
+    return (entries || []).filter((b) => b.date === dateStr).map(gasToUi);
   }, [entries, dateStr]);
 
   // Convert calendar events to block-like objects (type: 'plan')
@@ -283,21 +309,22 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
 
   const handleSaveBlock = (blockData) => {
     const allEntries = entries || [];
+    const gasEntry = uiToGas({ ...blockData, date: blockData.date || dateStr });
 
     if (blockData.id && !blockData.calendarEvent) {
       // Edit existing
       const updated = allEntries.map((b) =>
-        b.id === blockData.id ? { ...b, ...blockData } : b
+        b.id === blockData.id ? { ...b, ...gasEntry } : b
       );
       onUpdate(updated);
     } else {
       // Add new
-      const newBlock = {
-        ...blockData,
+      const newEntry = {
+        ...gasEntry,
         id: Date.now(),
         date: dateStr,
       };
-      onUpdate([...allEntries, newBlock]);
+      onUpdate([...allEntries, newEntry]);
     }
   };
 
