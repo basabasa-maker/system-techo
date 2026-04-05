@@ -491,13 +491,13 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
               {/* Block area */}
               <div
                 className="flex-1 flex items-center px-2 min-h-[36px]"
-                style={{ backgroundColor: bgColor }}
+                style={{
+                  backgroundColor: bgColor,
+                  borderTop: showText && topBlock ? '1.5px solid rgba(255,255,255,0.8)' : 'none',
+                }}
               >
                 {showText && topBlock && (
                   <span className="text-xs font-medium truncate" style={{ color: '#2c2c2c' }}>
-                    {topBlock.type === 'plan' && (
-                      <span className="mr-1 opacity-60">GCal</span>
-                    )}
                     {topBlock.description}
                   </span>
                 )}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { localDateStr, formatDisplayDate, DAY_NAMES } from '../utils/dateUtils';
 import JournalModal from './JournalModal';
 import ConfirmDialog from './ConfirmDialog';
@@ -43,6 +43,16 @@ export default function JournalTab({ journal, onUpdate }) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const entries = journal || {};
+
+  // Prevent page scroll when in calendar view (not entry view)
+  useEffect(() => {
+    if (!selectedDate) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [selectedDate]);
 
   const calendarDays = useMemo(
     () => generateCalendarDays(currentYear, currentMonth),
@@ -190,7 +200,7 @@ export default function JournalTab({ journal, onUpdate }) {
 
   // ===== Calendar View =====
   return (
-    <div className="max-w-lg mx-auto overflow-hidden" style={{ height: 'calc(100dvh - env(safe-area-inset-top, 0px) - 160px)' }}>
+    <div className="max-w-lg mx-auto">
       {/* Month Navigation */}
       <div className="flex items-center justify-between mb-5">
         <button
