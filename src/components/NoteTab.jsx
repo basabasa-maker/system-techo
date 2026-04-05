@@ -95,9 +95,9 @@ export default function NoteTab({ notes, onUpdate }) {
   };
 
   return (
-    <div className="pb-24">
+    <div className="pb-24 overflow-x-hidden">
       {/* Search */}
-      <div className="sticky top-[calc(env(safe-area-inset-top,0px)+104px)] z-30 bg-[#f5f5f0] pb-2 pt-1">
+      <div className="sticky top-[calc(env(safe-area-inset-top,0px)+104px)] z-30 bg-[#f5f5f0] -mx-4 px-4 pb-2 pt-1">
       <div className="flex gap-2 mb-0">
         <div className="relative flex-1">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b6b6b] text-sm">
