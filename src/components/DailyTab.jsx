@@ -233,8 +233,16 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
   }, [dateStr, loadCalendar]);
 
   // Filter blocks for the current date, converting GAS format to UI format
+  // Skip entries with no text/description or null/invalid hours
   const blocks = useMemo(() => {
-    return (entries || []).filter((b) => b.date === dateStr).map(gasToUi);
+    return (entries || [])
+      .filter((b) => b.date === dateStr)
+      .filter((b) => {
+        const hasText = (b.text && b.text.trim()) || (b.description && b.description.trim());
+        const hasValidHour = b.hour != null && !isNaN(Number(b.hour));
+        return hasText && hasValidHour;
+      })
+      .map(gasToUi);
   }, [entries, dateStr]);
 
   // Convert calendar events to block-like objects (type: 'plan')
