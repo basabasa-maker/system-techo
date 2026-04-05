@@ -44,9 +44,10 @@ export default function JournalTab({ journal, onUpdate }) {
 
   const entries = journal || {};
 
-  // Prevent page scroll when in calendar view (not entry view)
+  // Reset scroll position and prevent horizontal bounce in calendar view
   useEffect(() => {
     if (!selectedDate) {
+      window.scrollTo(0, 0);
       document.body.style.overflow = 'hidden';
       return () => { document.body.style.overflow = ''; };
     } else {

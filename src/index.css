@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 * { -webkit-tap-highlight-color: transparent; }
+html, body {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Sans', sans-serif;
   background: #f5f5f0;
