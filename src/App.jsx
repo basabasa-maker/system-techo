@@ -65,7 +65,6 @@ function App() {
             dateStr={dateStr}
             tasks={tasks}
             onUpdate={updateTasks}
-            headerHeight={headerHeight}
           />
         );
       case 'Note':
@@ -73,7 +72,6 @@ function App() {
           <NoteTab
             notes={notes}
             onUpdate={updateNotes}
-            headerHeight={headerHeight}
           />
         );
       case 'Journal':
@@ -89,7 +87,7 @@ function App() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f5f5f0', minHeight: '100vh' }}>
+    <div style={{ backgroundColor: '#f5f5f0', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header
         ref={headerRef}
         dateDisplay={formatDate()}
@@ -100,7 +98,9 @@ function App() {
         onReload={handleReload}
       />
       {/* Spacer for fixed header */}
-      <div style={{ paddingTop: `${headerHeight}px` }}>
+      <div style={{ height: `${headerHeight}px`, flexShrink: 0 }} />
+      {/* Scrollable content area */}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
         {/* Loading spinner */}
         {loading && (
           <div className="flex items-center justify-center py-20">

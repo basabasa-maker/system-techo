@@ -44,16 +44,7 @@ export default function JournalTab({ journal, onUpdate }) {
 
   const entries = journal || {};
 
-  // Reset scroll position and prevent horizontal bounce in calendar view
-  useEffect(() => {
-    if (!selectedDate) {
-      window.scrollTo(0, 0);
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
-    } else {
-      document.body.style.overflow = '';
-    }
-  }, [selectedDate]);
+  // No longer needed - body is always overflow:hidden, scrolling is in container
 
   const calendarDays = useMemo(
     () => generateCalendarDays(currentYear, currentMonth),
