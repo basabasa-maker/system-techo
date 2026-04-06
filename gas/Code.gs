@@ -227,7 +227,7 @@ function saveDailyItems(items) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, DAILY_HEADERS.length).clearContent();
   }
   if (items.length > 0) {
-    const rows = items.map(item => DAILY_HEADERS.map(h => item[h] || ''));
+    const rows = items.map(item => DAILY_HEADERS.map(h => item[h] != null ? item[h] : ''));
     sheet.getRange(2, 1, rows.length, DAILY_HEADERS.length).setValues(rows);
   }
   return makeResponse({ success: true, type: 'daily', count: items.length });
