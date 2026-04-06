@@ -36,7 +36,7 @@ function uiToGas(block) {
   };
 }
 
-function BlockModal({ isOpen, onClose, onSave, initialSlot, editingBlock }) {
+function BlockModal({ isOpen, onClose, onSave, onDelete, initialSlot, editingBlock }) {
   const [startHour, setStartHour] = useState(9);
   const [startMin, setStartMin] = useState(0);
   const [endHour, setEndHour] = useState(10);
@@ -206,6 +206,15 @@ function BlockModal({ isOpen, onClose, onSave, initialSlot, editingBlock }) {
           >
             キャンセル
           </button>
+          {editingBlock && onDelete && (
+            <button
+              onClick={() => { onDelete(editingBlock); onClose(); }}
+              className="flex-1 py-2 rounded text-sm font-bold text-white"
+              style={{ backgroundColor: '#c44' }}
+            >
+              削除
+            </button>
+          )}
           <button
             onClick={handleSave}
             className="flex-1 py-2 rounded text-sm font-bold text-white"
@@ -567,6 +576,7 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
         isOpen={modalOpen}
         onClose={() => { setModalOpen(false); setEditingBlock(null); }}
         onSave={handleSaveBlock}
+        onDelete={handleDeleteBlock}
         initialSlot={selectedSlot}
         editingBlock={editingBlock}
       />
