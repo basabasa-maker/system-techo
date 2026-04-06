@@ -309,22 +309,20 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
   }, [tasks, dateStr]);
 
   const handleSlotTap = (slot) => {
-    // Check if there's a manual block on this slot to edit
     const slotNum = slotToNumber(slot.hour, slot.minute);
     const slotEnd = slotNum + 0.5;
-    const existing = blocks.find((b) => {
+    // Search all blocks (manual, auto, plan) — only pure Google Calendar events are excluded
+    const existing = allBlocks.find((b) => {
       const bStart = slotToNumber(b.startHour, b.startMin);
       const bEnd = slotToNumber(b.endHour, b.endMin);
-      return bStart < slotEnd && bEnd > slotNum && !b.calendarEvent;
+      return bStart < slotEnd && bEnd > slotNum;
     });
 
     if (existing) {
-      // Edit existing block
       setEditingBlock(existing);
       setSelectedSlot(null);
       setModalOpen(true);
     } else {
-      // Add new block
       setEditingBlock(null);
       setSelectedSlot(slot);
       setModalOpen(true);
@@ -335,10 +333,14 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
     const allEntries = entries || [];
     const gasEntry = uiToGas({ ...blockData, date: blockData.date || dateStr });
 
-    if (blockData.id && !blockData.calendarEvent) {
-      // Edit existing
+    // Find matching entry in Sheets data by id (strip 'cal-' prefix if present)
+    const rawId = blockData.id ? String(blockData.id).replace(/^cal-/, '') : null;
+    const existingEntry = rawId ? allEntries.find((b) => String(b.id) === rawId) : null;
+
+    if (existingEntry) {
+      // Edit existing entry (manual, auto, or plan)
       const updated = allEntries.map((b) =>
-        b.id === blockData.id ? { ...b, ...gasEntry } : b
+        String(b.id) === rawId ? { ...b, ...gasEntry } : b
       );
       onUpdate(updated);
     } else {
@@ -353,13 +355,17 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
   };
 
   const handleDeleteBlock = (block) => {
-    if (block.calendarEvent) return; // Can't delete calendar events
+    // Find matching entry in Sheets data (strip 'cal-' prefix if present)
+    const rawId = block.id ? String(block.id).replace(/^cal-/, '') : null;
+    const existingEntry = rawId ? (entries || []).find((b) => String(b.id) === rawId) : null;
+    if (!existingEntry) return; // Pure calendar events with no Sheets entry can't be deleted
+
     setConfirmDialog({
       open: true,
       title: '予定を削除',
       message: `「${block.description}」を削除しますか？`,
       onConfirm: () => {
-        const updated = (entries || []).filter((b) => b.id !== block.id);
+        const updated = (entries || []).filter((b) => String(b.id) !== rawId);
         onUpdate(updated);
         setConfirmDialog((d) => ({ ...d, open: false }));
       },
@@ -367,7 +373,6 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
   };
 
   const handleLongPress = (block) => {
-    if (block.calendarEvent) return;
     handleDeleteBlock(block);
   };
 
@@ -427,7 +432,7 @@ export default function DailyTab({ dateStr, entries, calendarEvents, onUpdate, t
   const longPressTimer = useMemo(() => ({ current: null }), []);
 
   const handleTouchStart = (block) => {
-    if (!block || block.calendarEvent) return;
+    if (!block) return;
     longPressTimer.current = setTimeout(() => {
       handleLongPress(block);
     }, 600);
