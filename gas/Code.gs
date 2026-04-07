@@ -87,6 +87,7 @@ function getNotes() {
         let val = row[i];
         if (h === 'id') val = Number(val);
         if (h === 'read') val = val === true || val === 'TRUE' || val === 'true';
+        if (h === 'pinned') val = val === true || val === 'TRUE' || val === 'true';
         obj[h] = val;
       });
       return obj;
@@ -174,8 +175,9 @@ function saveNotes(items) {
   }
   if (items.length > 0) {
     const rows = items.map(item => NOTE_HEADERS.map(h => {
-      let val = item[h] || '';
-      if (h === 'read') val = item[h] === true ? 'TRUE' : 'FALSE';
+      let val = item[h] != null ? item[h] : '';
+      if (h === 'read') val = item[h] === true || item[h] === 'TRUE' ? 'TRUE' : 'FALSE';
+      if (h === 'pinned') val = item[h] === true || item[h] === 'TRUE' ? 'TRUE' : 'FALSE';
       if (h === 'content') val = (item[h] || '').substring(0, 50000); // Sheets cell limit
       return val;
     }));
