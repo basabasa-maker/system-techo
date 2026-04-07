@@ -9,6 +9,26 @@ function formatDate(isoStr) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())} 更新`;
 }
 
+function linkify(text) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) =>
+    urlRegex.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[#1e3a5f] underline break-all"
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
 function renderContent(content) {
   if (/<[a-z][\s\S]*>/i.test(content)) {
     return (
@@ -20,7 +40,7 @@ function renderContent(content) {
   }
   return (
     <div className="text-sm text-[#2c2c2c] leading-relaxed whitespace-pre-wrap">
-      {content}
+      {linkify(content)}
     </div>
   );
 }

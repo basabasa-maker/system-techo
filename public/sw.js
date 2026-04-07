@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v20260407-170859";
+const CACHE_VERSION = "v20260407-225259";
 const CACHE_NAME = `system-techo-${CACHE_VERSION}`;
 
 self.addEventListener("install", (event) => {
