@@ -133,6 +133,17 @@ function getJournal() {
   }
 }
 
+// --- Backup before overwrite ---
+function backupSheet(sheetName) {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var source = ss.getSheetByName(sheetName);
+  if (!source || source.getLastRow() <= 1) return;
+  var backupName = '_backup_' + sheetName;
+  var backup = ss.getSheetByName(backupName);
+  if (backup) ss.deleteSheet(backup);
+  source.copyTo(ss).setName(backupName);
+}
+
 // --- POST ---
 function doPost(e) {
   try {
@@ -156,8 +167,8 @@ function doPost(e) {
 }
 
 function saveNotes(items) {
+  backupSheet(SHEET_NAMES.notes);
   const sheet = getSheet(SHEET_NAMES.notes);
-  // Clear and rewrite
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, NOTE_HEADERS.length).clearContent();
   }
@@ -174,6 +185,7 @@ function saveNotes(items) {
 }
 
 function saveTasks(items) {
+  backupSheet(SHEET_NAMES.tasks);
   const sheet = getSheet(SHEET_NAMES.tasks);
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, TASK_HEADERS.length).clearContent();
@@ -186,6 +198,7 @@ function saveTasks(items) {
 }
 
 function saveJournalItems(items) {
+  backupSheet(SHEET_NAMES.journal);
   const sheet = getSheet(SHEET_NAMES.journal);
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, JOURNAL_HEADERS.length).clearContent();
@@ -222,6 +235,7 @@ function getDailyEntries() {
 }
 
 function saveDailyItems(items) {
+  backupSheet(SHEET_NAMES.daily);
   const sheet = getSheet(SHEET_NAMES.daily);
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, DAILY_HEADERS.length).clearContent();
