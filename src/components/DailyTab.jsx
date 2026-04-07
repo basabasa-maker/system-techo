@@ -1,6 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { generateTimeSlots, slotToNumber } from "../utils/dateUtils";
-import ConfirmDialog from "./ConfirmDialog";
 
 const TIME_SLOTS = generateTimeSlots();
 
@@ -10,257 +9,19 @@ const PRIORITY_COLORS = {
   低: "bg-[#7fb88f] text-white",
 };
 
-// GAS format {id, date, hour, endHour, type, text} → UI format {startHour, startMin, endHour, endMin, description, type}
-function gasToUi(entry) {
-  const h = Number(entry.hour);
-  const eh =
-    entry.endHour !== "" && entry.endHour != null
-      ? Number(entry.endHour)
-      : h + 1;
-  return {
-    ...entry,
-    startHour: Math.floor(h),
-    startMin: h % 1 >= 0.5 ? 30 : 0,
-    endHour: Math.floor(eh),
-    endMin: eh % 1 >= 0.5 ? 30 : 0,
-    description: entry.text || entry.description || "",
-  };
-}
-
-// UI format → GAS format for saving
-function uiToGas(block) {
-  return {
-    id: block.id,
-    date: block.date,
-    hour: block.startHour + (block.startMin === 30 ? 0.5 : 0),
-    endHour: block.endHour + (block.endMin === 30 ? 0.5 : 0),
-    type: block.type || "manual",
-    text: block.description || "",
-    created: block.created || new Date().toISOString(),
-  };
-}
-
-function BlockModal({
-  isOpen,
-  onClose,
-  onSave,
-  onDelete,
-  initialSlot,
-  editingBlock,
-}) {
-  const [startHour, setStartHour] = useState(9);
-  const [startMin, setStartMin] = useState(0);
-  const [endHour, setEndHour] = useState(10);
-  const [endMin, setEndMin] = useState(0);
-  const [description, setDescription] = useState("");
-  const [blockType, setBlockType] = useState("manual");
-
-  useEffect(() => {
-    if (isOpen) {
-      if (editingBlock) {
-        setStartHour(editingBlock.startHour);
-        setStartMin(editingBlock.startMin);
-        setEndHour(editingBlock.endHour);
-        setEndMin(editingBlock.endMin);
-        setDescription(editingBlock.description || "");
-        setBlockType(editingBlock.type || "manual");
-      } else if (initialSlot) {
-        setStartHour(initialSlot.hour);
-        setStartMin(initialSlot.minute);
-        setEndHour(initialSlot.hour + 1);
-        setEndMin(initialSlot.minute);
-        setDescription("");
-        setBlockType("manual");
-      } else {
-        setStartHour(9);
-        setStartMin(0);
-        setEndHour(10);
-        setEndMin(0);
-        setDescription("");
-        setBlockType("manual");
-      }
-    }
-  }, [isOpen, editingBlock, initialSlot]);
-
-  if (!isOpen) return null;
-
-  const handleSave = () => {
-    if (!description.trim()) return;
-    onSave({
-      ...(editingBlock || {}),
-      startHour,
-      startMin,
-      endHour,
-      endMin,
-      description: description.trim(),
-      type: blockType,
-    });
-    onClose();
-  };
-
-  const hourOptions = [];
-  for (let h = 4; h <= 27; h++) {
-    const displayH = h >= 24 ? h - 24 : h;
-    hourOptions.push(
-      <option key={h} value={h}>
-        {displayH}
-      </option>,
-    );
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-end justify-center"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-lg rounded-t-2xl p-5"
-        style={{ backgroundColor: "#f5f5f0" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-base font-bold mb-4" style={{ color: "#1e3a5f" }}>
-          {editingBlock ? "予定を編集" : "予定を追加"}
-        </h3>
-
-        {/* Time selectors */}
-        <div className="flex items-center gap-2 mb-3">
-          <label className="text-sm" style={{ color: "#6b6b6b" }}>
-            開始
-          </label>
-          <select
-            value={startHour}
-            onChange={(e) => setStartHour(Number(e.target.value))}
-            className="border rounded px-2 py-1 text-sm"
-            style={{ borderColor: "#e0ddd5" }}
-          >
-            {hourOptions}
-          </select>
-          <span>:</span>
-          <select
-            value={startMin}
-            onChange={(e) => setStartMin(Number(e.target.value))}
-            className="border rounded px-2 py-1 text-sm"
-            style={{ borderColor: "#e0ddd5" }}
-          >
-            <option value={0}>00</option>
-            <option value={30}>30</option>
-          </select>
-
-          <span className="mx-2">~</span>
-
-          <label className="text-sm" style={{ color: "#6b6b6b" }}>
-            終了
-          </label>
-          <select
-            value={endHour}
-            onChange={(e) => setEndHour(Number(e.target.value))}
-            className="border rounded px-2 py-1 text-sm"
-            style={{ borderColor: "#e0ddd5" }}
-          >
-            {hourOptions}
-          </select>
-          <span>:</span>
-          <select
-            value={endMin}
-            onChange={(e) => setEndMin(Number(e.target.value))}
-            className="border rounded px-2 py-1 text-sm"
-            style={{ borderColor: "#e0ddd5" }}
-          >
-            <option value={0}>00</option>
-            <option value={30}>30</option>
-          </select>
-        </div>
-
-        {/* Description */}
-        <input
-          type="text"
-          placeholder="予定の内容"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full border rounded px-3 py-2 text-sm mb-3"
-          style={{ borderColor: "#e0ddd5", backgroundColor: "white" }}
-          autoFocus
-        />
-
-        {/* Type selector */}
-        <div className="flex gap-3 mb-4">
-          <button
-            onClick={() => setBlockType("auto")}
-            className="flex-1 py-2 rounded text-sm font-medium border"
-            style={{
-              backgroundColor: blockType === "auto" ? "#b8d4e8" : "white",
-              borderColor: "#b8d4e8",
-              color: "#2c2c2c",
-            }}
-          >
-            翼 (Auto)
-          </button>
-          <button
-            onClick={() => setBlockType("manual")}
-            className="flex-1 py-2 rounded text-sm font-medium border"
-            style={{
-              backgroundColor: blockType === "manual" ? "#e8b8b8" : "white",
-              borderColor: "#e8b8b8",
-              color: "#2c2c2c",
-            }}
-          >
-            バサバサ (Manual)
-          </button>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2 rounded text-sm border"
-            style={{ borderColor: "#e0ddd5", color: "#6b6b6b" }}
-          >
-            キャンセル
-          </button>
-          {editingBlock && onDelete && (
-            <button
-              onClick={() => {
-                onDelete(editingBlock);
-                onClose();
-              }}
-              className="flex-1 py-2 rounded text-sm font-bold text-white"
-              style={{ backgroundColor: "#c44" }}
-            >
-              削除
-            </button>
-          )}
-          <button
-            onClick={handleSave}
-            className="flex-1 py-2 rounded text-sm font-bold text-white"
-            style={{ backgroundColor: "#1e3a5f" }}
-          >
-            保存
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+const TYPE_COLORS = {
+  plan: "#d4e8b8",
+  auto: "#b8d4e8",
+};
 
 export default function DailyTab({
   dateStr,
-  entries,
   calendarEvents,
-  onUpdate,
   tasks,
   onTasksUpdate,
   loadCalendar,
 }) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState(null);
-  const [editingBlock, setEditingBlock] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState({
-    open: false,
-    title: "",
-    message: "",
-    onConfirm: null,
-  });
+  const [refreshing, setRefreshing] = useState(false);
 
   // Load calendar events when dateStr changes
   useEffect(() => {
@@ -269,22 +30,15 @@ export default function DailyTab({
     }
   }, [dateStr, loadCalendar]);
 
-  // Filter blocks for the current date, converting GAS format to UI format
-  // Skip entries with no text/description or null/invalid hours
-  const blocks = useMemo(() => {
-    return (entries || [])
-      .filter((b) => b.date === dateStr)
-      .filter((b) => {
-        const hasText =
-          (b.text && b.text.trim()) || (b.description && b.description.trim());
-        const hasValidHour = b.hour != null && !isNaN(Number(b.hour));
-        return hasText && hasValidHour;
-      })
-      .map(gasToUi);
-  }, [entries, dateStr]);
+  // Manual refresh
+  const handleRefresh = useCallback(async () => {
+    if (!loadCalendar || !dateStr || refreshing) return;
+    setRefreshing(true);
+    await loadCalendar(dateStr);
+    setRefreshing(false);
+  }, [loadCalendar, dateStr, refreshing]);
 
-  // Convert calendar events to block-like objects (type: 'plan')
-  // GAS returns {id, hour, endHour, text, type} format
+  // Convert calendar events to block-like objects for timeline display
   const calendarBlocks = useMemo(() => {
     if (!calendarEvents || calendarEvents.length === 0) return [];
     return calendarEvents
@@ -292,7 +46,6 @@ export default function DailyTab({
         let startHour, startMin, endHour, endMin;
 
         if (ev.hour != null && !isNaN(Number(ev.hour))) {
-          // GAS format: {hour, endHour}
           const h = Number(ev.hour);
           const eh =
             ev.endHour != null && !isNaN(Number(ev.endHour))
@@ -303,7 +56,6 @@ export default function DailyTab({
           endHour = Math.floor(eh);
           endMin = eh % 1 >= 0.5 ? 30 : 0;
         } else if (ev.start) {
-          // ISO format fallback: {start, end}
           const startDate = new Date(ev.start);
           const endDate = ev.end ? new Date(ev.end) : null;
           if (!endDate) return null;
@@ -334,20 +86,25 @@ export default function DailyTab({
           endHour,
           endMin,
           description: ev.text || ev.summary || ev.title || "(予定)",
-          type: "plan",
-          calendarEvent: true,
+          type: ev.type || "plan",
+          calendarName: ev.calendarName || "",
         };
       })
       .filter(Boolean);
   }, [calendarEvents]);
 
-  // Merge manual entries with calendar blocks. Manual overrides auto/plan at same slot.
-  const allBlocks = useMemo(() => {
-    return [...blocks, ...calendarBlocks];
-  }, [blocks, calendarBlocks]);
+  // All-day events (hour === -1 or missing time info)
+  const allDayEvents = useMemo(() => {
+    if (!calendarEvents || calendarEvents.length === 0) return [];
+    return calendarEvents.filter(
+      (ev) =>
+        ev.allDay ||
+        (ev.hour != null && Number(ev.hour) === -1) ||
+        (ev.hour == null && !ev.start),
+    );
+  }, [calendarEvents]);
 
-  // Today's tasks: filter tasks with due === dateStr and active status
-  // Status compatibility: "進行中", "未着手", "", "active" are all treated as active
+  // Today's tasks
   const todayTasks = useMemo(() => {
     if (!tasks) return [];
     const activeStatuses = ["active", "進行中", "未着手", ""];
@@ -356,152 +113,93 @@ export default function DailyTab({
     );
   }, [tasks, dateStr]);
 
-  const handleSlotTap = (slot) => {
-    const slotNum = slotToNumber(slot.hour, slot.minute);
-    const slotEnd = slotNum + 0.5;
-    // Search all blocks (manual, auto, plan) — only pure Google Calendar events are excluded
-    const existing = allBlocks.find((b) => {
-      const bStart = slotToNumber(b.startHour, b.startMin);
-      const bEnd = slotToNumber(b.endHour, b.endMin);
-      return bStart < slotEnd && bEnd > slotNum;
-    });
-
-    if (existing) {
-      setEditingBlock(existing);
-      setSelectedSlot(null);
-      setModalOpen(true);
-    } else {
-      setEditingBlock(null);
-      setSelectedSlot(slot);
-      setModalOpen(true);
-    }
-  };
-
-  const handleSaveBlock = (blockData) => {
-    const allEntries = entries || [];
-    const gasEntry = uiToGas({ ...blockData, date: blockData.date || dateStr });
-
-    // Find matching entry in Sheets data by id (strip 'cal-' prefix if present)
-    const rawId = blockData.id
-      ? String(blockData.id).replace(/^cal-/, "")
-      : null;
-    const existingEntry = rawId
-      ? allEntries.find((b) => String(b.id) === rawId)
-      : null;
-
-    if (existingEntry) {
-      // Edit existing entry — replace with clean GAS-only fields to avoid stale UI fields
-      const updated = allEntries.map((b) =>
-        String(b.id) === rawId ? gasEntry : b,
-      );
-      onUpdate(updated);
-    } else {
-      // Add new
-      const newEntry = {
-        ...gasEntry,
-        id: Date.now(),
-        date: dateStr,
-      };
-      onUpdate([...allEntries, newEntry]);
-    }
-  };
-
-  const handleDeleteBlock = (block) => {
-    // Find matching entry in Sheets data (strip 'cal-' prefix if present)
-    const rawId = block.id ? String(block.id).replace(/^cal-/, "") : null;
-    const existingEntry = rawId
-      ? (entries || []).find((b) => String(b.id) === rawId)
-      : null;
-    if (!existingEntry) return; // Pure calendar events with no Sheets entry can't be deleted
-
-    setConfirmDialog({
-      open: true,
-      title: "予定を削除",
-      message: `「${block.description}」を削除しますか？`,
-      onConfirm: () => {
-        const updated = (entries || []).filter((b) => String(b.id) !== rawId);
-        onUpdate(updated);
-        setConfirmDialog((d) => ({ ...d, open: false }));
-      },
-    });
-  };
-
-  const handleLongPress = (block) => {
-    handleDeleteBlock(block);
-  };
-
-  const handleFabTap = () => {
-    setSelectedSlot(null);
-    setEditingBlock(null);
-    setModalOpen(true);
-  };
-
-  const handleTaskComplete = (task) => {
-    setConfirmDialog({
-      open: true,
-      title: "タスク完了",
-      message: `「${task.title}」を完了しますか？`,
-      onConfirm: () => {
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, "0");
-        const d = String(now.getDate()).padStart(2, "0");
-        const completedDate = `${y}-${m}-${d}`;
-
-        const updatedTasks = tasks.map((t) =>
-          t.id === task.id
-            ? { ...t, status: "completed", progress: 100, completedDate }
-            : t,
-        );
-        onTasksUpdate(updatedTasks);
-        setConfirmDialog((d) => ({ ...d, open: false }));
-      },
-    });
-  };
-
-  // Build slot -> block lookup. Manual > plan > auto priority.
+  // Build slot -> block lookup
   const slotBlockMap = useMemo(() => {
     const map = new Map();
     TIME_SLOTS.forEach((slot) => {
       const slotNum = slotToNumber(slot.hour, slot.minute);
       const slotEnd = slotNum + 0.5;
-      const overlapping = allBlocks
-        .filter((b) => {
-          const bStart = slotToNumber(b.startHour, b.startMin);
-          const bEnd = slotToNumber(b.endHour, b.endMin);
-          return bStart < slotEnd && bEnd > slotNum;
-        })
-        .sort((a, b) => {
-          // manual wins over plan/auto
-          const typePriority = { manual: 0, plan: 1, auto: 2 };
-          return (typePriority[a.type] ?? 1) - (typePriority[b.type] ?? 1);
-        });
+      const overlapping = calendarBlocks.filter((b) => {
+        const bStart = slotToNumber(b.startHour, b.startMin);
+        const bEnd = slotToNumber(b.endHour, b.endMin);
+        return bStart < slotEnd && bEnd > slotNum;
+      });
       const key = `${slot.hour}-${slot.minute}`;
       map.set(key, overlapping);
     });
     return map;
-  }, [allBlocks]);
+  }, [calendarBlocks]);
 
-  // Long press handling
-  const longPressTimer = useMemo(() => ({ current: null }), []);
+  const handleTaskComplete = (task) => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    const completedDate = `${y}-${m}-${d}`;
 
-  const handleTouchStart = (block) => {
-    if (!block) return;
-    longPressTimer.current = setTimeout(() => {
-      handleLongPress(block);
-    }, 600);
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+    const updatedTasks = tasks.map((t) =>
+      t.id === task.id
+        ? { ...t, status: "completed", progress: 100, completedDate }
+        : t,
+    );
+    onTasksUpdate(updatedTasks);
   };
 
   return (
     <div className="pb-24">
-      {/* Time Grid */}
+      {/* Refresh bar */}
+      <div
+        className="flex items-center justify-between px-4 py-2 border-b"
+        style={{ borderColor: "#e0ddd5" }}
+      >
+        <span className="text-xs" style={{ color: "#6b6b6b" }}>
+          Google Calendar
+        </span>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="text-xs px-3 py-1 rounded-full border"
+          style={{
+            borderColor: "#1e3a5f",
+            color: refreshing ? "#6b6b6b" : "#1e3a5f",
+            backgroundColor: "transparent",
+          }}
+        >
+          {refreshing ? "更新中..." : "更新"}
+        </button>
+      </div>
+
+      {/* All-day events */}
+      {allDayEvents.length > 0 && (
+        <div className="px-4 py-2 border-b" style={{ borderColor: "#e0ddd5" }}>
+          <div
+            className="text-xs font-medium mb-1"
+            style={{ color: "#6b6b6b" }}
+          >
+            終日
+          </div>
+          {allDayEvents.map((ev, i) => (
+            <div
+              key={`allday-${i}`}
+              className="text-xs px-2 py-1 rounded mb-1"
+              style={{ backgroundColor: "#d4e8b8", color: "#2c2c2c" }}
+            >
+              {ev.text || ev.summary || ev.title || "(終日の予定)"}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* No events message */}
+      {calendarBlocks.length === 0 && allDayEvents.length === 0 && (
+        <div className="text-center py-8">
+          <span className="text-sm" style={{ color: "#6b6b6b" }}>
+            この日の予定はありません
+          </span>
+        </div>
+      )}
+
+      {/* Time Grid - read-only calendar view */}
       <div>
         {TIME_SLOTS.map((slot) => {
           const key = `${slot.hour}-${slot.minute}`;
@@ -516,11 +214,7 @@ export default function DailyTab({
           }
 
           const bgColor = topBlock
-            ? topBlock.type === "plan"
-              ? "#d4e8b8"
-              : topBlock.type === "auto"
-                ? "#b8d4e8"
-                : "#e8b8b8"
+            ? TYPE_COLORS[topBlock.type] || "#d4e8b8"
             : "transparent";
 
           return (
@@ -531,10 +225,6 @@ export default function DailyTab({
                 borderColor: "#e0ddd5",
                 minHeight: "36px",
               }}
-              onClick={() => handleSlotTap(slot)}
-              onTouchStart={() => handleTouchStart(topBlock)}
-              onTouchEnd={handleTouchEnd}
-              onTouchCancel={handleTouchEnd}
             >
               {/* Time label */}
               <div
@@ -608,38 +298,6 @@ export default function DailyTab({
           ))
         )}
       </div>
-
-      {/* Floating Action Button */}
-      <button
-        onClick={handleFabTap}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl shadow-lg active:opacity-80 z-40"
-        style={{ backgroundColor: "#1e3a5f" }}
-        aria-label="Add entry"
-      >
-        +
-      </button>
-
-      {/* Block Modal */}
-      <BlockModal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingBlock(null);
-        }}
-        onSave={handleSaveBlock}
-        onDelete={handleDeleteBlock}
-        initialSlot={selectedSlot}
-        editingBlock={editingBlock}
-      />
-
-      {/* Confirm Dialog */}
-      <ConfirmDialog
-        isOpen={confirmDialog.open}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((d) => ({ ...d, open: false }))}
-      />
     </div>
   );
 }

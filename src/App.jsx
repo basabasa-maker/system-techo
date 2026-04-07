@@ -1,22 +1,33 @@
-import { useState, useEffect, useRef } from 'react';
-import Header from './components/Header';
-import DailyTab from './components/DailyTab';
-import TaskTab from './components/TaskTab';
-import NoteTab from './components/NoteTab';
-import JournalTab from './components/JournalTab';
-import { useLocalDate } from './hooks/useLocalDate';
-import { useGasSync } from './hooks/useGasSync';
+import { useState, useEffect, useRef } from "react";
+import Header from "./components/Header";
+import DailyTab from "./components/DailyTab";
+import TaskTab from "./components/TaskTab";
+import NoteTab from "./components/NoteTab";
+import JournalTab from "./components/JournalTab";
+import { useLocalDate } from "./hooks/useLocalDate";
+import { useGasSync } from "./hooks/useGasSync";
 
 function App() {
-  const [activeTab, setActiveTab] = useState('Daily');
+  const [activeTab, setActiveTab] = useState("Daily");
   const headerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(104);
-  const { currentDate, dateStr, goToPrevDay, goToNextDay, formatDate } = useLocalDate();
+  const { currentDate, dateStr, goToPrevDay, goToNextDay, formatDate } =
+    useLocalDate();
   const {
-    notes, tasks, journal, daily, calendarEvents,
-    loading, saving, error,
-    updateNotes, updateTasks, updateJournal, updateDaily,
-    loadCalendar, reload,
+    notes,
+    tasks,
+    journal,
+    daily,
+    calendarEvents,
+    loading,
+    saving,
+    error,
+    updateNotes,
+    updateTasks,
+    updateJournal,
+    updateDaily,
+    loadCalendar,
+    reload,
   } = useGasSync();
 
   useEffect(() => {
@@ -46,48 +57,38 @@ function App() {
 
   const renderTab = () => {
     switch (activeTab) {
-      case 'Daily':
+      case "Daily":
         return (
           <DailyTab
             dateStr={dateStr}
-            currentDate={currentDate}
-            entries={daily}
             calendarEvents={calendarEvents}
-            onUpdate={updateDaily}
             tasks={tasks}
             onTasksUpdate={updateTasks}
             loadCalendar={loadCalendar}
           />
         );
-      case 'Task':
+      case "Task":
         return (
-          <TaskTab
-            dateStr={dateStr}
-            tasks={tasks}
-            onUpdate={updateTasks}
-          />
+          <TaskTab dateStr={dateStr} tasks={tasks} onUpdate={updateTasks} />
         );
-      case 'Note':
-        return (
-          <NoteTab
-            notes={notes}
-            onUpdate={updateNotes}
-          />
-        );
-      case 'Journal':
-        return (
-          <JournalTab
-            journal={journal}
-            onUpdate={updateJournal}
-          />
-        );
+      case "Note":
+        return <NoteTab notes={notes} onUpdate={updateNotes} />;
+      case "Journal":
+        return <JournalTab journal={journal} onUpdate={updateJournal} />;
       default:
         return null;
     }
   };
 
   return (
-    <div style={{ backgroundColor: '#f5f5f0', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        backgroundColor: "#f5f5f0",
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <Header
         ref={headerRef}
         dateDisplay={formatDate()}
@@ -100,7 +101,14 @@ function App() {
       {/* Spacer for fixed header */}
       <div style={{ height: `${headerHeight}px`, flexShrink: 0 }} />
       {/* Scrollable content area */}
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
         {/* Loading spinner */}
         {loading && (
           <div className="flex items-center justify-center py-20">
