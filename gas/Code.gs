@@ -10,7 +10,7 @@ const SHEET_NAMES = {
   tasks: 'Tasks',
   daily: 'Daily'
 };
-const NOTE_HEADERS = ['id', 'title', 'content', 'read', 'created'];
+const NOTE_HEADERS = ['id', 'title', 'content', 'read', 'created', 'pinned'];
 const TASK_HEADERS = ['id', 'title', 'priority', 'due', 'progress', 'status', 'note', 'created', 'completedDate', 'shopping'];
 const JOURNAL_HEADERS = ['id', 'date', 'text', 'created'];
 const DAILY_HEADERS = ['id', 'date', 'hour', 'endHour', 'type', 'text', 'created'];
