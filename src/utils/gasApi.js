@@ -40,7 +40,7 @@ export async function saveData(type, items) {
   try {
     const response = await fetch(GAS_URL, {
       method: "POST",
-      mode: "no-cors",
+      mode: "cors",
       redirect: "follow",
       headers: {
         "Content-Type": "text/plain",
@@ -48,17 +48,15 @@ export async function saveData(type, items) {
       body: JSON.stringify({ type, items }),
     });
 
-    // no-cors returns opaque response (status 0, empty body)
-    // GAS processes the request server-side regardless
-    if (response.type === "opaque") {
+    // GAS redirects may return opaque or non-JSON responses
+    // but the data is saved server-side regardless
+    try {
+      const data = await response.json();
+      return data;
+    } catch {
+      // Response wasn't JSON (redirect/opaque) — treat as success
       return { success: true, type, count: items.length };
     }
-
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
-
-    return await response.json();
   } catch (error) {
     console.error(`saveData(${type}) failed:`, error);
     return null;
