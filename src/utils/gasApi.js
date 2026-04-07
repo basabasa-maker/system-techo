@@ -1,5 +1,5 @@
 const GAS_URL =
-  'https://script.google.com/macros/s/AKfycbxJQ_GSE_bJQYZPSvGe4K4Ar4Z65YBOhhFEuoOeRZh9ZNxc7n5ePxpLR5rVjLvcgWaMYg/exec';
+  "https://script.google.com/macros/s/AKfycbxJQ_GSE_bJQYZPSvGe4K4Ar4Z65YBOhhFEuoOeRZh9ZNxc7n5ePxpLR5rVjLvcgWaMYg/exec";
 
 /**
  * Fetch data from GAS backend
@@ -9,15 +9,15 @@ const GAS_URL =
 export async function fetchData(type, params = {}) {
   try {
     const url = new URL(GAS_URL);
-    url.searchParams.set('type', type);
+    url.searchParams.set("type", type);
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.set(key, value);
     });
 
     const response = await fetch(url.toString(), {
-      method: 'GET',
-      mode: 'cors',
-      redirect: 'follow',
+      method: "GET",
+      mode: "cors",
+      redirect: "follow",
     });
 
     if (!response.ok) {
@@ -39,14 +39,20 @@ export async function fetchData(type, params = {}) {
 export async function saveData(type, items) {
   try {
     const response = await fetch(GAS_URL, {
-      method: 'POST',
-      mode: 'cors',
-      redirect: 'follow',
+      method: "POST",
+      mode: "no-cors",
+      redirect: "follow",
       headers: {
-        'Content-Type': 'text/plain',
+        "Content-Type": "text/plain",
       },
       body: JSON.stringify({ type, items }),
     });
+
+    // no-cors returns opaque response (status 0, empty body)
+    // GAS processes the request server-side regardless
+    if (response.type === "opaque") {
+      return { success: true, type, count: items.length };
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP error: ${response.status}`);

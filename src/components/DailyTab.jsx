@@ -390,9 +390,9 @@ export default function DailyTab({
       : null;
 
     if (existingEntry) {
-      // Edit existing entry (manual, auto, or plan)
+      // Edit existing entry — replace with clean GAS-only fields to avoid stale UI fields
       const updated = allEntries.map((b) =>
-        String(b.id) === rawId ? { ...b, ...gasEntry } : b,
+        String(b.id) === rawId ? gasEntry : b,
       );
       onUpdate(updated);
     } else {
