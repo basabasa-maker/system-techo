@@ -3,16 +3,20 @@ import { generateTimeSlots, slotToNumber } from "../utils/dateUtils";
 
 const TIME_SLOTS = generateTimeSlots();
 
-const PRIORITY_COLORS = {
-  高: "bg-[#e8b8b8] text-[#2c2c2c]",
-  中: "bg-[#e8c88f] text-[#2c2c2c]",
-  低: "bg-[#7fb88f] text-white",
+const CALENDAR_COLORS = {
+  プライベート: "#4285f4",
+  取材: "#e67c73",
+  "取材(調整中)": "#f6bf26",
+  定期予定: "#33b679",
+  "定期予定(仕事)": "#039be5",
+  "不定期予定(仕事)": "#7986cb",
 };
 
-const TYPE_COLORS = {
-  plan: "#d4e8b8",
-  auto: "#b8d4e8",
-};
+const DEFAULT_COLOR = "#4285f4";
+
+function getEventColor(calendarName) {
+  return CALENDAR_COLORS[calendarName] || DEFAULT_COLOR;
+}
 
 export default function DailyTab({
   dateStr,
@@ -21,24 +25,23 @@ export default function DailyTab({
   onTasksUpdate,
   loadCalendar,
 }) {
-  const [refreshing, setRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  // Load calendar events when dateStr changes
-  useEffect(() => {
+  const handleReload = useCallback(() => {
     if (loadCalendar && dateStr) {
       loadCalendar(dateStr);
+      setHasLoaded(true);
     }
   }, [dateStr, loadCalendar]);
 
-  // Manual refresh
-  const handleRefresh = useCallback(async () => {
-    if (!loadCalendar || !dateStr || refreshing) return;
-    setRefreshing(true);
-    await loadCalendar(dateStr);
-    setRefreshing(false);
-  }, [loadCalendar, dateStr, refreshing]);
+  // Auto-load when date changes (only if already loaded once)
+  useEffect(() => {
+    if (hasLoaded && loadCalendar && dateStr) {
+      loadCalendar(dateStr);
+    }
+  }, [dateStr]);
 
-  // Convert calendar events to block-like objects for timeline display
+  // Convert calendar events to display blocks
   const calendarBlocks = useMemo(() => {
     if (!calendarEvents || calendarEvents.length === 0) return [];
     return calendarEvents
@@ -67,10 +70,8 @@ export default function DailyTab({
           return null;
         }
 
-        // Handle times before 4AM as next-day (24+)
         if (startHour < 4) startHour += 24;
         if (endHour < 4) endHour += 24;
-        // If end equals start, bump to at least 30min
         if (startHour === endHour && startMin === endMin) {
           endMin += 30;
           if (endMin >= 60) {
@@ -80,40 +81,20 @@ export default function DailyTab({
         }
 
         return {
-          id: `cal-${ev.id || ev.summary || ev.text}`,
+          id: ev.id || `cal-${ev.summary || ev.text}`,
           startHour,
           startMin,
           endHour,
           endMin,
           description: ev.text || ev.summary || ev.title || "(予定)",
-          type: ev.type || "plan",
           calendarName: ev.calendarName || "",
+          color: getEventColor(ev.calendarName),
         };
       })
       .filter(Boolean);
   }, [calendarEvents]);
 
-  // All-day events (hour === -1 or missing time info)
-  const allDayEvents = useMemo(() => {
-    if (!calendarEvents || calendarEvents.length === 0) return [];
-    return calendarEvents.filter(
-      (ev) =>
-        ev.allDay ||
-        (ev.hour != null && Number(ev.hour) === -1) ||
-        (ev.hour == null && !ev.start),
-    );
-  }, [calendarEvents]);
-
-  // Today's tasks
-  const todayTasks = useMemo(() => {
-    if (!tasks) return [];
-    const activeStatuses = ["active", "進行中", "未着手", ""];
-    return tasks.filter(
-      (t) => t.due === dateStr && activeStatuses.includes(t.status),
-    );
-  }, [tasks, dateStr]);
-
-  // Build slot -> block lookup
+  // Build slot map — supports multiple events per slot
   const slotBlockMap = useMemo(() => {
     const map = new Map();
     TIME_SLOTS.forEach((slot) => {
@@ -124,11 +105,19 @@ export default function DailyTab({
         const bEnd = slotToNumber(b.endHour, b.endMin);
         return bStart < slotEnd && bEnd > slotNum;
       });
-      const key = `${slot.hour}-${slot.minute}`;
-      map.set(key, overlapping);
+      map.set(`${slot.hour}-${slot.minute}`, overlapping);
     });
     return map;
   }, [calendarBlocks]);
+
+  // Today's tasks
+  const todayTasks = useMemo(() => {
+    if (!tasks) return [];
+    const activeStatuses = ["active", "進行中", "未着手", ""];
+    return tasks.filter(
+      (t) => t.due === dateStr && activeStatuses.includes(t.status),
+    );
+  }, [tasks, dateStr]);
 
   const handleTaskComplete = (task) => {
     const now = new Date();
@@ -136,7 +125,6 @@ export default function DailyTab({
     const m = String(now.getMonth() + 1).padStart(2, "0");
     const d = String(now.getDate()).padStart(2, "0");
     const completedDate = `${y}-${m}-${d}`;
-
     const updatedTasks = tasks.map((t) =>
       t.id === task.id
         ? { ...t, status: "completed", progress: 100, completedDate }
@@ -145,86 +133,36 @@ export default function DailyTab({
     onTasksUpdate(updatedTasks);
   };
 
-  return (
-    <div className="pb-24">
-      {/* Refresh bar */}
-      <div
-        className="flex items-center justify-between px-4 py-2 border-b"
-        style={{ borderColor: "#e0ddd5" }}
-      >
-        <span className="text-xs" style={{ color: "#6b6b6b" }}>
-          Google Calendar
-        </span>
+  // Not loaded yet — show prompt
+  if (!hasLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <p className="text-sm text-[#6b6b6b] mb-4">
+          カレンダーを読み込んでください
+        </p>
         <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="text-xs px-3 py-1 rounded-full border"
-          style={{
-            borderColor: "#1e3a5f",
-            color: refreshing ? "#6b6b6b" : "#1e3a5f",
-            backgroundColor: "transparent",
-          }}
+          onClick={handleReload}
+          className="px-6 py-2.5 rounded-lg bg-[#1e3a5f] text-white text-sm"
         >
-          {refreshing ? "更新中..." : "更新"}
+          読み込む
         </button>
       </div>
+    );
+  }
 
-      {/* All-day events */}
-      {allDayEvents.length > 0 && (
-        <div className="px-4 py-2 border-b" style={{ borderColor: "#e0ddd5" }}>
-          <div
-            className="text-xs font-medium mb-1"
-            style={{ color: "#6b6b6b" }}
-          >
-            終日
-          </div>
-          {allDayEvents.map((ev, i) => (
-            <div
-              key={`allday-${i}`}
-              className="text-xs px-2 py-1 rounded mb-1"
-              style={{ backgroundColor: "#d4e8b8", color: "#2c2c2c" }}
-            >
-              {ev.text || ev.summary || ev.title || "(終日の予定)"}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* No events message */}
-      {calendarBlocks.length === 0 && allDayEvents.length === 0 && (
-        <div className="text-center py-8">
-          <span className="text-sm" style={{ color: "#6b6b6b" }}>
-            この日の予定はありません
-          </span>
-        </div>
-      )}
-
-      {/* Time Grid - read-only calendar view */}
+  return (
+    <div className="pb-24">
+      {/* Time Grid */}
       <div>
         {TIME_SLOTS.map((slot) => {
           const key = `${slot.hour}-${slot.minute}`;
           const overlapping = slotBlockMap.get(key) || [];
-          const topBlock = overlapping[0] || null;
-
-          let showText = false;
-          if (topBlock) {
-            const bStart = slotToNumber(topBlock.startHour, topBlock.startMin);
-            const slotNum = slotToNumber(slot.hour, slot.minute);
-            showText = Math.abs(bStart - slotNum) < 0.01;
-          }
-
-          const bgColor = topBlock
-            ? TYPE_COLORS[topBlock.type] || "#d4e8b8"
-            : "transparent";
 
           return (
             <div
               key={key}
               className="flex items-stretch border-b"
-              style={{
-                borderColor: "#e0ddd5",
-                minHeight: "36px",
-              }}
+              style={{ borderColor: "#e0ddd5", minHeight: "36px" }}
             >
               {/* Time label */}
               <div
@@ -237,24 +175,47 @@ export default function DailyTab({
               >
                 {slot.label}
               </div>
-              {/* Block area */}
-              <div
-                className="flex-1 flex items-center px-2 min-h-[36px]"
-                style={{
-                  backgroundColor: bgColor,
-                  borderTop:
-                    showText && topBlock
-                      ? "1.5px solid rgba(255,255,255,0.8)"
-                      : "none",
-                }}
-              >
-                {showText && topBlock && (
-                  <span
-                    className="text-xs font-medium truncate"
-                    style={{ color: "#2c2c2c" }}
-                  >
-                    {topBlock.description}
-                  </span>
+
+              {/* Event blocks */}
+              <div className="flex-1 flex min-h-[36px]">
+                {overlapping.length === 0 ? (
+                  <div className="flex-1" />
+                ) : (
+                  overlapping.map((block, idx) => {
+                    const bStart = slotToNumber(
+                      block.startHour,
+                      block.startMin,
+                    );
+                    const slotNum = slotToNumber(slot.hour, slot.minute);
+                    const showText = Math.abs(bStart - slotNum) < 0.01;
+                    const width =
+                      overlapping.length > 1
+                        ? `${100 / overlapping.length}%`
+                        : "100%";
+
+                    return (
+                      <div
+                        key={block.id + "-" + idx}
+                        className="flex items-center px-2"
+                        style={{
+                          width,
+                          backgroundColor: block.color + "30",
+                          borderLeft: showText
+                            ? `3px solid ${block.color}`
+                            : `3px solid transparent`,
+                        }}
+                      >
+                        {showText && (
+                          <span
+                            className="text-xs font-medium truncate"
+                            style={{ color: "#2c2c2c" }}
+                          >
+                            {block.description}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -287,17 +248,20 @@ export default function DailyTab({
               <span className="text-sm flex-1" style={{ color: "#2c2c2c" }}>
                 {task.title}
               </span>
-              {task.priority && (
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLORS[task.priority] || ""}`}
-                >
-                  {task.priority}
-                </span>
-              )}
             </div>
           ))
         )}
       </div>
+
+      {/* Reload FAB */}
+      <button
+        onClick={handleReload}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center text-white text-xl shadow-lg active:opacity-80 z-40"
+        style={{ backgroundColor: "#1e3a5f" }}
+        aria-label="Reload calendar"
+      >
+        ↻
+      </button>
     </div>
   );
 }
