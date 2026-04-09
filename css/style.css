@@ -461,26 +461,40 @@ body {
 
 .task-check {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border);
-  border-radius: 4px;
+  width: 44px;
+  height: 44px;
+  border: none;
   background: transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 2px;
-  min-width: 44px;
-  min-height: 44px;
   padding: 0;
-  font-size: 11px;
+  position: relative;
 }
 
-.task-check.checked {
+.task-check::before {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+}
+
+.task-check.checked::before {
   background: var(--success);
   border-color: var(--success);
+}
+
+.task-check.checked::after {
+  content: "✓";
+  position: absolute;
   color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .task-body {

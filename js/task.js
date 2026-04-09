@@ -157,9 +157,7 @@ function createTaskCard(task) {
     : "";
 
   card.innerHTML = `
-    <button class="task-check ${isComplete ? "checked" : ""}" data-action="toggle" aria-label="完了切替">
-      ${isComplete ? "✓" : ""}
-    </button>
+    <button class="task-check ${isComplete ? "checked" : ""}" data-action="toggle" aria-label="完了切替"></button>
     <div class="task-body" data-action="edit">
       <div class="task-title">${escapeHtml(task.title || "無題")}</div>
       <div class="task-meta">
