@@ -161,7 +161,6 @@ body {
   display: flex;
   background: var(--card-bg);
   border-bottom: 1px solid var(--border);
-  padding-top: var(--safe-top);
 }
 
 .tab-btn {
