@@ -1,6 +1,6 @@
 // sw.js - Service Worker (network-first戦略)
 
-const CACHE_VERSION = "system-techo-v2-20260409-001";
+const CACHE_VERSION = "system-techo-v2-20260409-002";
 
 const PRECACHE_URLS = [
   "./",
