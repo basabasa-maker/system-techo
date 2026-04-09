@@ -29,19 +29,23 @@ document.addEventListener("DOMContentLoaded", () => {
 // --- Header Spacer (ResizeObserver) ---
 
 function setupHeaderSpacer() {
-  const topBar = document.getElementById("app-top-bar");
+  const header = document.getElementById("app-header");
+  const tabBar = document.getElementById("tab-bar");
   const spacer = document.getElementById("header-spacer");
   const warning = document.getElementById("gas-warning");
 
   const observer = new ResizeObserver(() => {
-    let height = topBar.offsetHeight;
+    let height = header.offsetHeight + tabBar.offsetHeight;
     if (warning.style.display !== "none") {
       height += warning.offsetHeight;
     }
     spacer.style.height = height + "px";
+    // タブバーをヘッダー直下に配置
+    tabBar.style.top = header.offsetHeight + "px";
   });
 
-  observer.observe(topBar);
+  observer.observe(header);
+  observer.observe(tabBar);
   observer.observe(warning);
 }
 

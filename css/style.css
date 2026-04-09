@@ -50,22 +50,19 @@ body {
   background: var(--bg);
 }
 
-/* ---- Top Bar (Header + Tabs) ---- */
-#app-top-bar {
+/* ---- Header ---- */
+#app-header {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 100;
-  background: var(--header-bg);
-  padding-top: var(--safe-top);
-}
-
-#app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
+  padding: 12px 16px;
+  padding-top: calc(12px + var(--safe-top));
+  background: var(--header-bg);
   color: var(--header-text);
 }
 
@@ -156,6 +153,11 @@ body {
 
 /* ---- Tab Bar ---- */
 #tab-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 99;
   display: flex;
   background: var(--card-bg);
   border-bottom: 1px solid var(--border);
