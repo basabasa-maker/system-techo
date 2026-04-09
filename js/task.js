@@ -200,12 +200,14 @@ function toggleComplete(id) {
   const task = tasks.find((t) => t.id === id);
   if (!task) return;
 
-  if (task.status === "completed") {
-    task.status = "active";
-    task.completedDate = "";
-  } else {
+  if (task.status !== "completed") {
+    if (!confirm("「" + (task.title || "無題") + "」を完了にしますか？"))
+      return;
     task.status = "completed";
     task.completedDate = todayStr();
+  } else {
+    task.status = "active";
+    task.completedDate = "";
   }
   task.updated = formatDateTime(new Date());
 
