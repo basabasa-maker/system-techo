@@ -2,7 +2,8 @@
 
 import { gasGet, gasPost } from "./gas-client.js";
 
-const DEFAULT_GAS_URL = "";
+const DEFAULT_GAS_URL =
+  "https://script.google.com/macros/s/AKfycbyEiStixBx3CpzMJiD3f2pLtMi_TtZLkyCmvVCDmdU_6B2uGbUmb5W64HACymFDyX7Asg/exec";
 
 const STORAGE_KEYS = {
   tasks: "system-techo-v2-tasks",
