@@ -1,14 +1,14 @@
-// daily.js - Dailyタブ（カレンダー予定 + 今日のタスク）
+// daily.js - Dailyタブ（タイムライン形式カレンダー + 関連タスク）
 
 import { todayStr, formatDate } from "./date-utils.js";
 import { linkify } from "./url-utils.js";
-import { getTasks, getGasUrl } from "./store.js";
-import { gasGet } from "./gas-client.js";
-import { showToast } from "./app.js";
+import { getTasks, getDaily } from "./store.js";
 
 let currentDateStr = null;
-let calendarEvents = [];
-let loading = false;
+
+const HOUR_START = 6;
+const HOUR_END = 23;
+const PX_PER_HOUR = 60;
 
 // --- Public API (app.js interface) ---
 
@@ -23,7 +23,9 @@ export function onActivate() {
   if (!currentDateStr) {
     currentDateStr = todayStr();
   }
-  loadCalendarEvents(currentDateStr);
+  // キャッシュから表示するだけ。GAS呼び出しはしない
+  var container = document.getElementById("tab-content");
+  renderDaily(container);
 }
 
 // --- Main Render ---
@@ -31,16 +33,20 @@ export function onActivate() {
 function renderDaily(container) {
   container = container || document.getElementById("tab-content");
 
-  const dateLabel = formatDateJP(currentDateStr);
-  const isToday = currentDateStr === todayStr();
+  var dateLabel = formatDateJP(currentDateStr);
+  var isToday = currentDateStr === todayStr();
 
-  let html = '<div class="daily-container">';
+  // localStorageキャッシュからイベント取得
+  var allEvents = getDaily();
+  var dayEvents = filterEventsByDate(allEvents, currentDateStr);
+
+  var html = '<div class="daily-container">';
 
   // Date Navigation
   html += '<div class="daily-nav">';
   html += '<button class="daily-nav-btn" id="daily-prev">&lt;</button>';
   html += '<div class="daily-nav-center">';
-  html += `<span class="daily-date-label">${dateLabel}</span>`;
+  html += '<span class="daily-date-label">' + escapeHtml(dateLabel) + "</span>";
   if (!isToday) {
     html += '<button class="daily-today-btn" id="daily-today">today</button>';
   }
@@ -48,37 +54,34 @@ function renderDaily(container) {
   html += '<button class="daily-nav-btn" id="daily-next">&gt;</button>';
   html += "</div>";
 
-  // Calendar Events Section
-  html += '<div class="daily-section">';
-  html += '<div class="daily-section-title">Googleカレンダー</div>';
-
-  if (loading) {
-    html += '<div class="loading-indicator">読み込み中...</div>';
-  } else if (calendarEvents.length === 0) {
-    html += '<p class="empty-msg">予定はありません</p>';
+  // データなしの場合
+  if (!allEvents || allEvents.length === 0) {
+    html += '<div class="daily-empty-msg">';
+    html += "更新ボタンを押してカレンダーを取得してください";
+    html += "</div>";
   } else {
-    // Split: all-day events first, then timed events sorted by startTime
-    const allDay = calendarEvents.filter(function (e) {
+    // 終日イベント
+    var allDay = dayEvents.filter(function (e) {
       return e.isAllDay;
     });
-    const timed = calendarEvents.filter(function (e) {
+    var timed = dayEvents.filter(function (e) {
       return !e.isAllDay;
     });
-    timed.sort(function (a, b) {
-      return (a.startTime || "").localeCompare(b.startTime || "");
-    });
 
-    const sorted = allDay.concat(timed);
-
-    html += '<div class="daily-events">';
-    for (const ev of sorted) {
-      html += renderEventCard(ev);
+    // 終日イベント表示
+    if (allDay.length > 0) {
+      html += '<div class="daily-allday-section">';
+      for (var i = 0; i < allDay.length; i++) {
+        html += renderAllDayEvent(allDay[i]);
+      }
+      html += "</div>";
     }
-    html += "</div>";
-  }
-  html += "</div>";
 
-  // Today's Tasks Section
+    // タイムライン
+    html += renderTimeline(timed, isToday);
+  }
+
+  // 関連タスク
   html += '<div class="daily-section">';
   html += '<div class="daily-section-title">関連タスク</div>';
   html += renderTodayTasks();
@@ -103,29 +106,27 @@ function renderDaily(container) {
   if (todayBtn) {
     todayBtn.addEventListener("click", function () {
       currentDateStr = todayStr();
-      loadCalendarEvents(currentDateStr);
       renderDaily(container);
     });
   }
 }
 
-// --- Event Card ---
+// --- Filter events by date ---
 
-function renderEventCard(ev) {
-  var timeDisplay = "";
-  if (ev.isAllDay) {
-    timeDisplay = "all day";
-  } else {
-    timeDisplay = ev.startTime || "";
-    if (ev.endTime) {
-      timeDisplay += " - " + ev.endTime;
-    }
-  }
+function filterEventsByDate(events, dateStr) {
+  if (!events || !Array.isArray(events)) return [];
+  return events.filter(function (e) {
+    return e.date === dateStr;
+  });
+}
 
+// --- All-day event ---
+
+function renderAllDayEvent(ev) {
   var locationHtml = "";
   if (ev.location) {
     locationHtml =
-      '<div class="daily-event-location">' +
+      '<div class="daily-allday-location">' +
       linkify(String(ev.location)) +
       "</div>";
   }
@@ -133,16 +134,16 @@ function renderEventCard(ev) {
   var calLabel = "";
   if (ev.calendarName) {
     calLabel =
-      '<span class="daily-event-cal">' +
+      '<span class="daily-allday-cal">' +
       escapeHtml(ev.calendarName) +
       "</span>";
   }
 
-  var html = '<div class="daily-event-card">';
-  html += '<div class="daily-event-time">' + escapeHtml(timeDisplay) + "</div>";
-  html += '<div class="daily-event-body">';
+  var html = '<div class="daily-allday-event">';
+  html += '<div class="daily-allday-badge">all day</div>';
+  html += '<div class="daily-allday-body">';
   html +=
-    '<div class="daily-event-title">' +
+    '<div class="daily-allday-title">' +
     escapeHtml(ev.title || "(no title)") +
     "</div>";
   html += locationHtml;
@@ -152,20 +153,115 @@ function renderEventCard(ev) {
   return html;
 }
 
+// --- Timeline ---
+
+function renderTimeline(timedEvents, isToday) {
+  var totalHours = HOUR_END - HOUR_START;
+  var timelineHeight = totalHours * PX_PER_HOUR;
+
+  var html = '<div class="daily-timeline-wrapper">';
+  html +=
+    '<div class="daily-timeline" style="height:' + timelineHeight + 'px">';
+
+  // 時間軸ラベル + 横線
+  for (var h = HOUR_START; h <= HOUR_END; h++) {
+    var top = (h - HOUR_START) * PX_PER_HOUR;
+    var label = String(h).padStart(2, "0") + ":00";
+    html +=
+      '<div class="daily-hour-row" style="top:' +
+      top +
+      'px">' +
+      '<span class="daily-hour-label">' +
+      label +
+      "</span>" +
+      '<div class="daily-hour-line"></div>' +
+      "</div>";
+  }
+
+  // 現在時刻インジケーター
+  if (isToday) {
+    var now = new Date();
+    var nowH = now.getHours();
+    var nowM = now.getMinutes();
+    if (nowH >= HOUR_START && nowH < HOUR_END) {
+      var nowTop = (nowH - HOUR_START) * PX_PER_HOUR + nowM;
+      html += '<div class="daily-now-line" style="top:' + nowTop + 'px"></div>';
+    }
+  }
+
+  // イベントブロック
+  for (var i = 0; i < timedEvents.length; i++) {
+    html += renderTimelineEvent(timedEvents[i]);
+  }
+
+  html += "</div>"; // .daily-timeline
+  html += "</div>"; // .daily-timeline-wrapper
+  return html;
+}
+
+function renderTimelineEvent(ev) {
+  var startMin = parseTimeToMinutes(ev.startTime);
+  var endMin = parseTimeToMinutes(ev.endTime);
+
+  // 範囲外の場合はクランプ
+  var rangeStartMin = HOUR_START * 60;
+  var rangeEndMin = HOUR_END * 60;
+
+  if (startMin === null || startMin < rangeStartMin) startMin = rangeStartMin;
+  if (endMin === null || endMin <= startMin) endMin = startMin + 60;
+  if (endMin > rangeEndMin) endMin = rangeEndMin;
+
+  var top = ((startMin - rangeStartMin) / 60) * PX_PER_HOUR;
+  var height = ((endMin - startMin) / 60) * PX_PER_HOUR;
+  if (height < 28) height = 28; // 最小高さ
+
+  var timeLabel = (ev.startTime || "") + (ev.endTime ? " - " + ev.endTime : "");
+
+  var locationHtml = "";
+  if (ev.location) {
+    locationHtml =
+      '<div class="daily-tl-location">' +
+      linkify(String(ev.location)) +
+      "</div>";
+  }
+
+  var calLabel = "";
+  if (ev.calendarName) {
+    calLabel =
+      '<span class="daily-tl-cal">' + escapeHtml(ev.calendarName) + "</span>";
+  }
+
+  var html =
+    '<div class="daily-tl-event" style="top:' +
+    top +
+    "px;height:" +
+    height +
+    'px">';
+  html +=
+    '<div class="daily-tl-event-title">' +
+    escapeHtml(ev.title || "(no title)") +
+    "</div>";
+  if (timeLabel) {
+    html +=
+      '<div class="daily-tl-event-time">' + escapeHtml(timeLabel) + "</div>";
+  }
+  html += locationHtml;
+  html += calLabel;
+  html += "</div>";
+  return html;
+}
+
 // --- Today's Tasks ---
 
 function renderTodayTasks() {
   var tasks = getTasks();
-  var today = todayStr();
 
-  // Filter: active tasks that are due today or overdue
   var relevant = tasks.filter(function (t) {
     if (t.status === "completed" || t.deleted === "TRUE") return false;
     if (!t.due) return false;
     return t.due <= currentDateStr;
   });
 
-  // Sort: overdue first, then by due date
   relevant.sort(function (a, b) {
     return (a.due || "").localeCompare(b.due || "");
   });
@@ -192,40 +288,6 @@ function renderTodayTasks() {
   return html;
 }
 
-// --- Data Loading ---
-
-async function loadCalendarEvents(dateStr) {
-  var url = getGasUrl();
-  if (!url) {
-    calendarEvents = [];
-    return;
-  }
-
-  loading = true;
-  showToast("カレンダー取得中...", "info");
-
-  // Re-render to show loading state
-  var container = document.getElementById("tab-content");
-  renderDaily(container);
-
-  try {
-    var result = await gasGet(url, { type: "calendar", date: dateStr });
-    if (result.events) {
-      calendarEvents = result.events;
-    } else if (result.success && result.data && result.data.events) {
-      calendarEvents = result.data.events;
-    } else {
-      calendarEvents = [];
-    }
-  } catch (e) {
-    calendarEvents = [];
-    showToast("カレンダー取得失敗", "error");
-  } finally {
-    loading = false;
-    renderDaily(container);
-  }
-}
-
 // --- Navigation ---
 
 function navigateDate(offset) {
@@ -233,10 +295,19 @@ function navigateDate(offset) {
   var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
   d.setDate(d.getDate() + offset);
   currentDateStr = formatDate(d);
-  loadCalendarEvents(currentDateStr);
 }
 
 // --- Utility ---
+
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return null;
+  var parts = timeStr.split(":");
+  if (parts.length < 2) return null;
+  var h = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
 
 function formatDateJP(dateStr) {
   var parts = dateStr.split("-");
