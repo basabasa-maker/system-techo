@@ -16,6 +16,12 @@ const TAB_MODULES = {
 let currentTab = "task";
 let syncing = false;
 
+// 他モジュールから現在のアクティブタブを確認するために公開
+// （非同期処理のレース防止：描画先が既に別タブに切り替わっていたら書き込まない）
+export function getCurrentTab() {
+  return currentTab;
+}
+
 // --- Init ---
 
 document.addEventListener("DOMContentLoaded", () => {

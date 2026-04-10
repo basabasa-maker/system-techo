@@ -2,7 +2,7 @@
 
 import { todayStr, formatDate } from "./date-utils.js";
 import { linkify } from "./url-utils.js";
-import { getTasks, getDaily, getGasUrl } from "./store.js";
+import { getTasks, getDaily, getJournal, getGasUrl } from "./store.js";
 import { gasGet } from "./gas-client.js";
 
 let currentDateStr = null;
@@ -98,6 +98,12 @@ function renderDaily(container) {
     // タイムライン
     html += renderTimeline(timed, isToday);
   }
+
+  // 記録（Journal）— その日にジャーナルで記録した内容
+  html += '<div class="daily-section">';
+  html += '<div class="daily-section-title">記録</div>';
+  html += renderDayJournalEntries();
+  html += "</div>";
 
   // 関連タスク
   html += '<div class="daily-section">';
@@ -265,6 +271,42 @@ function renderTimelineEvent(ev) {
   }
   html += locationHtml;
   html += calLabel;
+  html += "</div>";
+  return html;
+}
+
+// --- Day's Journal Entries ---
+
+function renderDayJournalEntries() {
+  var all = getJournal() || [];
+  var entries = all.filter(function (e) {
+    if (!e || e.date !== currentDateStr) return false;
+    if (e.deleted === true || e.deleted === "TRUE") return false;
+    return true;
+  });
+
+  if (entries.length === 0) {
+    return '<p class="empty-msg">この日の記録はありません</p>';
+  }
+
+  entries.sort(function (a, b) {
+    return String(a.time || "").localeCompare(String(b.time || ""));
+  });
+
+  var html = '<div class="daily-journal-list">';
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    html += '<div class="daily-journal-entry">';
+    html +=
+      '<div class="daily-journal-time">' +
+      escapeHtml(e.time || "--:--") +
+      "</div>";
+    html +=
+      '<div class="daily-journal-content">' +
+      linkify(String(e.content || "")) +
+      "</div>";
+    html += "</div>";
+  }
   html += "</div>";
   return html;
 }

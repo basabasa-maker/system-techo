@@ -3,7 +3,7 @@
 import { todayStr, formatDate, generateId } from "./date-utils.js";
 import { linkify } from "./url-utils.js";
 import { getJournal, getGasUrl } from "./store.js";
-import { gasGet, gasPost } from "./gas-client.js";
+import { gasPost } from "./gas-client.js";
 import { showToast, openModal, closeModal } from "./app.js";
 
 let currentYear;
@@ -29,7 +29,41 @@ export function onActivate() {
     currentYear = now.getFullYear();
     currentMonth = now.getMonth();
   }
-  loadMonthDots();
+  // 手動更新以外ではGASを叩かない。ローカルキャッシュからドットを再計算する。
+  rebuildMonthDotsFromCache();
+}
+
+// 更新ボタン押下時にapp.jsから呼ばれる
+// pullAll()でlocalStorageは既に更新済みなので、ローカルから再計算するだけでよい
+export async function refresh() {
+  rebuildMonthDotsFromCache();
+  if (viewMode === "dayview" && currentDateStr) {
+    rebuildDayEntriesFromCache(currentDateStr);
+  }
+}
+
+// --- ローカルキャッシュからの再構築 ---
+
+function rebuildMonthDotsFromCache() {
+  const all = getJournal() || [];
+  const ym = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
+  const dots = {};
+  for (const entry of all) {
+    if (!entry || !entry.date) continue;
+    if (entry.deleted === true || entry.deleted === "TRUE") continue;
+    if (!entry.date.startsWith(ym)) continue;
+    dots[entry.date] = (dots[entry.date] || 0) + 1;
+  }
+  journalDates = dots;
+}
+
+function rebuildDayEntriesFromCache(dateStr) {
+  const all = getJournal() || [];
+  dayEntries = all.filter(function (e) {
+    if (!e || e.date !== dateStr) return false;
+    if (e.deleted === true || e.deleted === "TRUE") return false;
+    return true;
+  });
 }
 
 // --- Calendar View ---
@@ -101,9 +135,9 @@ function renderCalendar(container) {
       const ds = cell.dataset.date;
       if (ds) {
         currentDateStr = ds;
-        loadDayEntries(ds).then(() => {
-          renderDayView(container);
-        });
+        // 手動更新以外でGASを叩かない。ローカルキャッシュから組み立てる。
+        rebuildDayEntriesFromCache(ds);
+        renderDayView(container);
       }
     });
   });
@@ -306,42 +340,11 @@ function confirmDelete(entryId) {
 
 // --- Data Loading ---
 
-async function loadMonthDots() {
-  const url = getGasUrl();
-  if (!url) return;
-  const ym = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
-  try {
-    const result = await gasGet(url, { type: "journal", month: ym });
-    if (result.success && result.data && result.data.dates) {
-      journalDates = result.data.dates;
-      // 現在calendarが表示中なら再描画
-      if (viewMode === "calendar") {
-        const container = document.getElementById("tab-content");
-        renderCalendar(container);
-      }
-    }
-  } catch (e) {
-    // サイレント失敗（ローカルキャッシュで動作）
-  }
-}
-
-async function loadDayEntries(dateStr) {
-  const url = getGasUrl();
-  if (!url) {
-    dayEntries = [];
-    return;
-  }
-  try {
-    const result = await gasGet(url, { type: "journal", date: dateStr });
-    if (result.success && result.data) {
-      dayEntries = result.data.journal || result.data.entries || [];
-    } else {
-      dayEntries = [];
-    }
-  } catch (e) {
-    dayEntries = [];
-  }
-}
+// 注意: 旧GAS直接フェッチ関数は廃止済み。
+// refresh() は pullAll() でlocalStorageが更新された後に呼ばれるため、
+// ローカルキャッシュから再計算すれば十分。
+// （レース条件対策：Journalタブでない間は #tab-content に書き込まないため、
+//  GAS直叩きをする非同期コールバック経路自体を削除する）
 
 // --- Utility ---
 
