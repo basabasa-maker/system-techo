@@ -2,9 +2,14 @@
 
 import { todayStr, formatDate, generateId } from "./date-utils.js";
 import { linkify } from "./url-utils.js";
-import { getJournal, getGasUrl } from "./store.js";
-import { gasPost } from "./gas-client.js";
-import { showToast, openModal, closeModal } from "./app.js";
+import {
+  getJournal,
+  getGasUrl,
+  mergeJournalByMonth,
+  fetchJournalDay,
+} from "./store.js";
+import { gasGet, gasPost } from "./gas-client.js";
+import { showToast, openModal, closeModal, getCurrentTab } from "./app.js";
 
 let currentYear;
 let currentMonth;
@@ -34,12 +39,48 @@ export function onActivate() {
 }
 
 // 更新ボタン押下時にapp.jsから呼ばれる
-// pullAll()でlocalStorageは既に更新済みなので、ローカルから再計算するだけでよい
+// pullAll()に加えて、現在表示中の月のJournalデータを月別APIで再取得する。
+// （GASのgetAllは当日分しか返さないため、過去データを復元するにはこれが必要）
 export async function refresh() {
+  const ym = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
+  try {
+    await loadMonthEntries(ym);
+  } catch (e) {
+    // サイレント失敗（ローカルキャッシュで動作）
+  }
   rebuildMonthDotsFromCache();
   if (viewMode === "dayview" && currentDateStr) {
+    try {
+      await fetchJournalDay(currentDateStr);
+    } catch (e) {
+      // サイレント失敗
+    }
     rebuildDayEntriesFromCache(currentDateStr);
   }
+}
+
+// 指定月のJournalエントリ全件をGASから取得してlocalStorageにマージ
+// （GASのtype:"journal",month:ym はドット数しか返さないため、
+//  日付リストを取ってから各日をfetchJournalDayで引く。N+1だが月表示初回のみ）
+async function loadMonthEntries(ym) {
+  const url = getGasUrl();
+  if (!url) return;
+  const result = await gasGet(url, { type: "journal", month: ym });
+  if (!result || !result.success || !result.data || !result.data.dates) return;
+  const dates = Object.keys(result.data.dates);
+  const allEntries = [];
+  for (const d of dates) {
+    try {
+      const dayResult = await gasGet(url, { type: "journal", date: d });
+      if (dayResult && dayResult.success && dayResult.data) {
+        const arr = dayResult.data.journal || dayResult.data.entries || [];
+        for (const ent of arr) allEntries.push(ent);
+      }
+    } catch (e) {
+      // 1日分の失敗は無視
+    }
+  }
+  mergeJournalByMonth(ym, allEntries);
 }
 
 // --- ローカルキャッシュからの再構築 ---
@@ -115,7 +156,7 @@ function renderCalendar(container) {
     } else {
       currentMonth--;
     }
-    loadMonthDots();
+    rebuildMonthDotsFromCache();
     renderCalendar(container);
   });
 
@@ -126,7 +167,7 @@ function renderCalendar(container) {
     } else {
       currentMonth++;
     }
-    loadMonthDots();
+    rebuildMonthDotsFromCache();
     renderCalendar(container);
   });
 

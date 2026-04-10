@@ -84,10 +84,10 @@ export async function pullAll() {
       );
     }
     if (result.data.journal) {
-      localStorage.setItem(
-        STORAGE_KEYS.journal,
-        JSON.stringify(result.data.journal),
-      );
+      // 重要: GASの type:"all" は「当日分のみ」しか返さないため、
+      // 全件上書きすると過去データが消失する（過去に発生した重大事故の原因）。
+      // 当日分だけを既存キャッシュにマージする。
+      mergeJournalByDate(result.data.journal);
     }
     if (result.data.daily) {
       localStorage.setItem(
@@ -117,6 +117,49 @@ export function getJournal() {
   } catch {
     return [];
   }
+}
+
+// Journalを月単位でマージ保存（過去データを残したまま該当月だけ差し替え）
+export function mergeJournalByMonth(yearMonth, entries) {
+  if (!yearMonth || !Array.isArray(entries)) return;
+  const existing = getJournal();
+  // 該当月以外を残す
+  const others = existing.filter((e) => {
+    const d = String(e && e.date ? e.date : "");
+    return d.substring(0, 7) !== yearMonth;
+  });
+  const merged = others.concat(entries);
+  localStorage.setItem(STORAGE_KEYS.journal, JSON.stringify(merged));
+}
+
+// GetAllで返ってきた当日分だけを既存キャッシュにマージ
+// （IDで置換。該当IDがなければ追加。他の日のエントリには触らない）
+function mergeJournalByDate(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return;
+  const existing = getJournal();
+  const byId = new Map(existing.map((e) => [e.id, e]));
+  for (const e of entries) {
+    if (e && e.id) byId.set(e.id, e);
+  }
+  const merged = Array.from(byId.values());
+  localStorage.setItem(STORAGE_KEYS.journal, JSON.stringify(merged));
+}
+
+// Journalを指定日のみGASから取得してマージ保存（単一日再取得用）
+export async function fetchJournalDay(dateStr) {
+  const url = getGasUrl();
+  if (!url) throw new Error("GAS URLが未設定です");
+  const result = await gasGet(url, { type: "journal", date: dateStr });
+  if (!result.success || !result.data) return [];
+  const entries = result.data.journal || result.data.entries || [];
+  // 既存の該当日エントリを削除して差し替え
+  const existing = getJournal();
+  const others = existing.filter((e) => {
+    return !e || String(e.date) !== dateStr;
+  });
+  const merged = others.concat(entries);
+  localStorage.setItem(STORAGE_KEYS.journal, JSON.stringify(merged));
+  return entries;
 }
 
 export function getDaily() {

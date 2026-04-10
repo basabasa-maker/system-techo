@@ -57,7 +57,10 @@ function rerenderList() {
 // --- Filtering & Sorting ---
 
 function getFilteredNotes() {
-  let notes = allNotes.filter((n) => !n.deleted && n.deleted !== "TRUE");
+  // readlaterは別アプリ（ニュース）連携で扱うため、ノートタブでは表示しない
+  let notes = allNotes.filter(
+    (n) => !n.deleted && n.deleted !== "TRUE" && n.type !== "readlater",
+  );
 
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
@@ -68,17 +71,12 @@ function getFilteredNotes() {
     );
   }
 
-  // Split into readlater and normal
-  const readlater = notes.filter((n) => n.type === "readlater");
-  const normal = notes.filter((n) => n.type !== "readlater");
-
-  // Sort each group
   const sortFn =
     sortOrder === "desc"
       ? (a, b) => (b.created || "").localeCompare(a.created || "")
       : (a, b) => (a.created || "").localeCompare(b.created || "");
 
-  // Pinned first within each group
+  // Pinned first
   const pinnedSort = (a, b) => {
     const ap = a.pinned === true || a.pinned === "TRUE" ? 1 : 0;
     const bp = b.pinned === true || b.pinned === "TRUE" ? 1 : 0;
@@ -86,10 +84,8 @@ function getFilteredNotes() {
     return sortFn(a, b);
   };
 
-  readlater.sort(pinnedSort);
-  normal.sort(pinnedSort);
-
-  return { readlater, normal };
+  notes.sort(pinnedSort);
+  return notes;
 }
 
 function isPinned(note) {
@@ -103,8 +99,7 @@ function isRead(note) {
 // --- Main Render ---
 
 function renderNoteList(container) {
-  const { readlater, normal } = getFilteredNotes();
-  const unreadCount = readlater.filter((n) => !isRead(n)).length;
+  const notes = getFilteredNotes();
 
   let html = '<div class="note-container">';
 
@@ -114,8 +109,6 @@ function renderNoteList(container) {
   html += '<div class="note-toolbar">';
   html += `<button class="note-sort-btn" id="note-sort">${sortOrder === "desc" ? "新しい順" : "古い順"}</button>`;
   html += '<button class="note-add-btn" id="note-add-normal">+ ノート</button>';
-  html +=
-    '<button class="note-add-btn note-add-readlater" id="note-add-readlater">+ 後で読む</button>';
   html += "</div></div>";
 
   // Loading
@@ -123,25 +116,12 @@ function renderNoteList(container) {
     html += '<div class="loading-indicator">読み込み中...</div>';
   }
 
-  // Read Later section
-  html += `<div class="note-section-header">後で読む${unreadCount > 0 ? "（" + unreadCount + "件未読）" : ""}</div>`;
-  if (readlater.length === 0) {
-    html += '<p class="note-empty-msg">後で読むアイテムはありません</p>';
-  } else {
-    html += '<div class="note-list">';
-    for (const note of readlater) {
-      html += renderReadlaterCard(note);
-    }
-    html += "</div>";
-  }
-
-  // Normal notes section
-  html += '<div class="note-section-header">ノート</div>';
-  if (normal.length === 0 && !loading) {
+  // Notes
+  if (notes.length === 0 && !loading) {
     html += '<p class="note-empty-msg">ノートはまだありません</p>';
   } else {
     html += '<div class="note-list">';
-    for (const note of normal) {
+    for (const note of notes) {
       html += renderNoteCard(note);
     }
     html += "</div>";
@@ -158,30 +138,6 @@ function renderNoteList(container) {
 }
 
 // --- Card Renderers ---
-
-function renderReadlaterCard(note) {
-  const read = isRead(note);
-  const classes = ["note-card", "note-card-readlater"];
-  if (read) classes.push("note-read");
-
-  let html = `<div class="${classes.join(" ")}" data-id="${note.id}">`;
-  html += '<div class="note-card-header">';
-  html += `<button class="note-read-btn" data-id="${note.id}" title="既読チェック">${read ? "&#9745;" : "&#9744;"}</button>`;
-  html += `<span class="note-card-title">${escapeHtml(note.title || "（無題）")}</span>`;
-  html += "</div>";
-  if (note.url) {
-    html += `<div class="note-card-url"><a href="${escapeAttr(note.url)}" target="_blank" rel="noopener noreferrer" class="auto-link">${escapeHtml(note.url)}</a></div>`;
-  }
-  if (note.source) {
-    html += `<div class="note-card-source">${escapeHtml(note.source)}</div>`;
-  }
-  html += `<div class="note-card-date">${formatCreated(note.created)}</div>`;
-  html += '<div class="note-card-actions">';
-  html += `<button class="note-edit-btn" data-id="${note.id}">編集</button>`;
-  html += `<button class="note-delete-btn" data-id="${note.id}">削除</button>`;
-  html += "</div></div>";
-  return html;
-}
 
 function renderNoteCard(note) {
   const pinned = isPinned(note);
@@ -238,14 +194,8 @@ function bindSortEvent(container) {
 
 function bindAddEvents(container) {
   const addNormal = container.querySelector("#note-add-normal");
-  const addReadlater = container.querySelector("#note-add-readlater");
   if (addNormal) {
     addNormal.addEventListener("click", () => openNoteModal(null, "normal"));
-  }
-  if (addReadlater) {
-    addReadlater.addEventListener("click", () =>
-      openNoteModal(null, "readlater"),
-    );
   }
 }
 
