@@ -99,9 +99,13 @@ function setupSyncButton() {
 
     try {
       await pullAll();
+      // タブ固有のリフレッシュ処理
+      const mod = TAB_MODULES[currentTab];
+      if (mod && mod.refresh) {
+        await mod.refresh();
+      }
       // 現在のタブを再描画
       const contentEl = document.getElementById("tab-content");
-      const mod = TAB_MODULES[currentTab];
       if (mod) {
         mod.render(contentEl);
         if (mod.onActivate) mod.onActivate();

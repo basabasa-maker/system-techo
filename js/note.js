@@ -19,7 +19,13 @@ export function render(container) {
 
 export function onActivate() {
   allNotes = getNotes();
-  loadNotesFromGAS();
+  // GAS呼び出しはしない。更新ボタン押下時のみpullAllで取得
+}
+
+// 更新ボタン押下時にapp.jsから呼ばれる
+export async function refresh() {
+  allNotes = getNotes();
+  rerenderList();
 }
 
 // --- Data Loading ---

@@ -2,7 +2,8 @@
 
 import { todayStr, formatDate } from "./date-utils.js";
 import { linkify } from "./url-utils.js";
-import { getTasks, getDaily } from "./store.js";
+import { getTasks, getDaily, getGasUrl } from "./store.js";
+import { gasGet } from "./gas-client.js";
 
 let currentDateStr = null;
 
@@ -23,9 +24,26 @@ export function onActivate() {
   if (!currentDateStr) {
     currentDateStr = todayStr();
   }
-  // キャッシュから表示するだけ。GAS呼び出しはしない
-  var container = document.getElementById("tab-content");
-  renderDaily(container);
+}
+
+// 更新ボタン押下時にapp.jsから呼ばれる
+export async function refresh() {
+  var url = getGasUrl();
+  if (!url) return;
+  try {
+    var result = await gasGet(url, { type: "calendar", date: currentDateStr });
+    if (result.success && result.data && result.data.events) {
+      var cached = getDaily() || [];
+      // 当日分を差し替え
+      cached = cached.filter(function (e) {
+        return e.date !== currentDateStr;
+      });
+      cached = cached.concat(result.data.events);
+      localStorage.setItem("system-techo-v2-daily", JSON.stringify(cached));
+    }
+  } catch (e) {
+    // pullAllのエラーハンドリングに任せる
+  }
 }
 
 // --- Main Render ---
